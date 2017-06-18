@@ -1,0 +1,5 @@
+geoTriMesh 0.9
+Copyright [2016-2017] Michael Nolde
+
+This product includes software developed at
+flatpolar.org (http://www.flatpolar.org/).

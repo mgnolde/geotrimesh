@@ -11,3 +11,4 @@ Usage:
 
 
 ![alt text](./demodata/sample.png "Himalaya")
+*Tile of the TOCOMEE dataset (imported into Blender), created with geoTriMesh*

@@ -9,3 +9,5 @@ Usage:
 	elevation_mesh = geotrimesh.ElevationMesh()
 	elevation_mesh.generate_mesh(dem='srtm3.tif', ortho='bluemarble.tif', bound='osm.shp', mesh_prefix='sample')
 
+
+![alt text](./demodata/sample.png "Himalaya")

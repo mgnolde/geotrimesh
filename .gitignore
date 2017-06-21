@@ -2,6 +2,7 @@
 *.swp
 *.tar.gz
 *.zip
+*.gz
 
 build/
 .git/

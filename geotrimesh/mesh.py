@@ -31,20 +31,8 @@ from scipy.spatial import Delaunay
 import argparse
 
 
-## TODO:
-## integrate tiling in main program
-## integrate getting seperated dem / ortho data in main program
-## test numpy array instead of shp intermediate storage
-
-
-#logging.basicConfig(level=logging.INFO)
-
-logger = logging.getLogger('geomesh')
-hdlr = logging.FileHandler('log.txt')
-formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-hdlr.setFormatter(formatter)
-logger.addHandler(hdlr) 
-logger.setLevel(logging.INFO)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 
@@ -212,8 +200,6 @@ class ElevationMesh(object):
         
                     in_geometry = in_tile_bbox.Intersection(in_boundaries_geom)
                     in_geometry_feature_defn = in_boundaries_layer.GetLayerDefn()
-                    #in_dem = merge_tiles(in_dem_path, in_dem_format, in_tile_bbox)
-                    #in_ortho = merge_tiles(in_ortho_path, in_ortho_format, in_tile_bbox)
                                       
                     if in_geometry != None and str(in_geometry).upper() != 'GEOMETRYCOLLECTION EMPTY':
                         self.ogr_to_elevation_mesh(in_dem, in_ortho, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_ortho_nodata_ext, out_triangles_layer)
@@ -323,9 +309,6 @@ class ElevationMesh(object):
             
             in_dem_nodata = in_dem_nodata_ext
             
-            #except:
-            #in_dem_nodata = int(round(in_dem_band.GetNoDataValue(),0))
-
             #logger.info("dem_clip_array: %s %s %s %s", in_dem_clip_col_min, in_dem_clip_row_min, \
             #                        in_dem_clip_col_max - in_dem_clip_col_min, \
             #                        in_dem_clip_row_max - in_dem_clip_row_min)
@@ -351,8 +334,6 @@ class ElevationMesh(object):
             in_ortho_band_blue = in_ortho.GetRasterBand(3)
             
             in_ortho_nodata = in_ortho_nodata_ext
-            #except:
-            #    in_ortho_nodata = int(round(in_ortho_band_red.GetNoDataValue(),0))
     
             #logger.info("ortho_clip_array: %s %s %s %s", in_ortho_clip_col_min, in_ortho_clip_row_min, \
             #                        in_ortho_clip_col_max - in_ortho_clip_col_min, \
@@ -842,7 +823,7 @@ class ElevationMesh(object):
     def conv_triangle_shape_to_x3d(self, in_triangles_layer, out_mesh_filename, indexed_colors=True):
       
         in_triangles_feature_count = in_triangles_layer.GetFeatureCount()
-        print("feature_count:", in_triangles_feature_count)
+        logger.info('feature_count: %s', in_triangles_feature_count)
                
         out_mesh = open(out_mesh_filename, 'w')
         logger.info(out_mesh_filename)
@@ -1027,15 +1008,7 @@ class ElevationMesh(object):
                                                     ( colors_array_alpha[:] == round(color_alpha,2) ) )
 
 
-                    #for color_location in color_locations:
-                    #    colors_array_red[color_location] = numpy.nan
-                    #    colors_array_green[color_location] = numpy.nan
-                    #    colors_array_blue[color_location] = numpy.nan
-                    #    colors_array_alpha[color_location] = numpy.nan
-                    #
-                    #    nodecolors_array[color_location] = unique_nodecolors_cnt
 
-                    #print(len(color_locations[0]))
                     if len(color_locations[0]) > 0:
 
                         colors_array_red[color_locations] = numpy.nan
@@ -1137,18 +1110,7 @@ class ElevationMesh(object):
         out_mesh.write('<X3D version="3.0" profile="Immersive" xmlns:xsd="http://www.w3.org/2001/XMLSchema-instance" xsd:noNamespaceSchemaLocation="http://www.web3d.org/specifications/x3d-3.0.xsd">' + '\n')
         out_mesh.write('    <head>' + '\n')
         out_mesh.write('        <meta name="filename" content="' + out_mesh_filename + '" />' + '\n')
-        out_mesh.write('        <meta name="generator" content="geomesh 1.0" />' + '\n')
-        
-        #out_mesh.write('        <meta content="' + out_mesh_filename[:-4] + '" name="title"/>' + '\n')
-        #out_mesh.write('        <meta content="Part of the GTAEM90 dataset" name="description"/>' + '\n')
-        #out_mesh.write('        <meta content="Michael Nolde" name="creator"/>' + '\n')
-        #out_mesh.write('        <meta content="02/2017" name="created"/>' + '\n')
-        #out_mesh.write('        <meta content="1.0" name="version"/>' + '\n')
-        #out_mesh.write('        <meta content="http://www.flatpolar.org/gtaem90" name="identifier"/>' + '\n')
-
-        #out_mesh.write('        <meta content="This work is licensed under: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)" name="rights"/>' + '\n')
-        #out_mesh.write('        <meta content="https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode" name="license"/>' + '\n')
-        
+        out_mesh.write('        <meta name="generator" content="geoTriMesh 0.9" />' + '\n')
         out_mesh.write('    </head>' + '\n')
         out_mesh.write('    <Scene>' + '\n')
         out_mesh.write('        <NavigationInfo headlight="false"' + '\n')
@@ -1205,7 +1167,7 @@ class ElevationMesh(object):
     
             out_mesh.write('                                        colorIndex="')
 
-            print('Highest color reference:', numpy.amax(nodecolors_array))
+            logger.info('Highest color reference: %s', numpy.amax(nodecolors_array))
     
             for nodecolor_id, nodecolor in enumerate(nodecolors_array):
 
@@ -1261,7 +1223,7 @@ class ElevationMesh(object):
 
 
 
-        print('Number of unique colors:', len(colors_array_lut_red), len(colors_array_lut_green), len(colors_array_lut_blue), len(colors_array_lut_alpha))
+        logger.info('Number of unique colors: %s %s %s %s', len(colors_array_lut_red), len(colors_array_lut_green), len(colors_array_lut_blue), len(colors_array_lut_alpha))
 
         for color_lut_id, (color_lut_red, color_lut_green, color_lut_blue, color_lut_alpha) in enumerate(zip(colors_array_lut_red, colors_array_lut_green, colors_array_lut_blue, colors_array_lut_alpha)):
     

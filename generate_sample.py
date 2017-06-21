@@ -21,16 +21,11 @@
 ## URL: http://www.flatpolar.org
 ## 2017/06
 
-import geotrimesh
+from geotrimesh import mesh
 
 osm='./demodata/osm201704_bound_adm8_pottenstein.shp'
 srtm3='./demodata/srtm3_n049_e011_3arc_v2_clip.tif'
 bluemarble='./demodata/bmng_200407_21600x21600_c1_clip.tif'
 
-elevation_mesh = geotrimesh.ElevationMesh()
-elevation_mesh.generate_mesh(dem=srtm3, ortho=bluemarble, bound=osm, mesh_prefix='pottenstein')
-
-
-
-
-
+elevation = mesh.ElevationMesh()
+elevation.generate_mesh(dem=srtm3, ortho=bluemarble, bound=osm, mesh_prefix='pottenstein')

@@ -4,10 +4,10 @@ Converts GIS data to colored 3D meshes (X3D)
 
 Usage:
 
-	import geotrimesh
+	from geotrimesh import mesh
 
-	elevation_mesh = geotrimesh.ElevationMesh()
-	elevation_mesh.generate_mesh(dem='srtm3.tif', ortho='bluemarble.tif', bound='osm.shp', mesh_prefix='sample')
+	elevation = mesh.ElevationMesh()
+	elevation.generate_mesh(dem='srtm3.tif', ortho='bluemarble.tif', bound='osm.shp', mesh_prefix='sample')
 
 
 ![alt text](./demodata/sample.png "Himalaya")

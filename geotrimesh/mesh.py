@@ -43,8 +43,9 @@ class ElevationMesh(object):
         pass
 
 
-    def generate_mesh(self, dem, ortho, bound, dem_nodata=-9999, ortho_nodata=-9999, stepwidth=360, mesh_prefix='out', mesh_path='.', out_shape=False):
+    def generate_mesh(self, dem, ortho, bound, dem_nodata=-9999, ortho_nodata=-9999, stepwidth=360, mesh_prefix='out', mesh_path='.', out_shape=False, scale_xy=0.000001, exageration_z=1.0, projection='orig', positioning='center', indexed_colors=True, coloring_mode='ortho'):
         
+        logger.info('generating mesh')
         
         in_dem_filename = dem
         in_ortho_filename = ortho
@@ -62,16 +63,33 @@ class ElevationMesh(object):
         out_triangles_filename_prefix = out_mesh_filename_prefix
         out_triangles_path = out_mesh_path
         
-        indexed_colors = True
-        coloring_mode = 'ortho'
         in_dem_format = 'tif'
         in_ortho_format = 'tif'
         
-        
+        out_triangles_x_min_bound_total = 999999999
+        out_triangles_x_max_bound_total = -999999999
+        out_triangles_y_min_bound_total = 999999999
+        out_triangles_y_max_bound_total = -999999999
+        out_triangles_z_min_bound_total = 999999999
+        out_triangles_z_max_bound_total = -999999999
+
+
         
         
         in_dem = gdal.Open(in_dem_filename)
         in_ortho = gdal.Open(in_ortho_filename)
+
+        in_dem_band = in_dem.GetRasterBand(1)
+        in_dem_stats = in_dem_band.GetStatistics( True, True )
+
+        if in_dem_stats != None:
+            in_dem_stats_minmax = [in_dem_stats[0], in_dem_stats[1]]
+        else:
+            in_dem_stats_minmax = [-418, 8848] # Shore of Dead Sea, Mt. Everest
+            
+
+
+
         
         
         for lon_min in range(-180, 180, stepwidth):
@@ -95,9 +113,9 @@ class ElevationMesh(object):
         
         
                 if lon_min < 0:
-                    x_min_str = 'e'+ x_min_str
-                else:
                     x_min_str = 'w'+ x_min_str
+                else:
+                    x_min_str = 'e'+ x_min_str
         
                 if lat_min < 0:
                     y_min_str = 's'+ y_min_str
@@ -122,6 +140,7 @@ class ElevationMesh(object):
                 in_boundaries = in_boundaries_driver.Open(in_boundaries_filename, 0)
                 in_boundaries_layer = in_boundaries.GetLayer()
                 in_boundaries_x_min, in_boundaries_x_max, in_boundaries_y_min, in_boundaries_y_max = in_boundaries_layer.GetExtent()
+                in_boundaries_extent = [in_boundaries_x_min, in_boundaries_x_max, in_boundaries_y_min, in_boundaries_y_max]
                 in_boundaries_spatialref = in_boundaries_layer.GetSpatialRef()
         
         
@@ -202,9 +221,23 @@ class ElevationMesh(object):
                     in_geometry_feature_defn = in_boundaries_layer.GetLayerDefn()
                                       
                     if in_geometry != None and str(in_geometry).upper() != 'GEOMETRYCOLLECTION EMPTY':
-                        self.ogr_to_elevation_mesh(in_dem, in_ortho, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_ortho_nodata_ext, out_triangles_layer)
+                        out_triangles_minmax_geom_total = self.ogr_to_elevation_mesh(in_dem, in_ortho, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_ortho_nodata_ext, out_triangles_layer, indexed_colors, coloring_mode)
                         
-                      
+
+                        out_triangles_x_min_geom_total, out_triangles_x_max_geom_total, out_triangles_y_min_geom_total, out_triangles_y_max_geom_total, out_triangles_z_min_geom_total, out_triangles_z_max_geom_total = out_triangles_minmax_geom_total
+
+                        #out_triangles_x_min_bound_total = min(out_triangles_x_min_bound_total, out_triangles_x_min_geom_total)
+                        #out_triangles_x_max_bound_total = max(out_triangles_x_max_bound_total, out_triangles_x_max_geom_total)
+                        #out_triangles_y_min_bound_total = min(out_triangles_y_min_bound_total, out_triangles_y_min_geom_total)
+                        #out_triangles_y_max_bound_total = max(out_triangles_y_max_bound_total, out_triangles_y_max_geom_total)
+                        out_triangles_z_min_bound_total = min(out_triangles_z_min_bound_total, out_triangles_z_min_geom_total)
+                        out_triangles_z_max_bound_total = max(out_triangles_z_max_bound_total, out_triangles_z_max_geom_total)
+
+   
+                out_triangles_minmax_bound_total = [out_triangles_x_min_bound_total, out_triangles_x_max_bound_total, 
+                                        out_triangles_y_min_bound_total, out_triangles_y_max_bound_total, 
+                                        out_triangles_z_min_bound_total, out_triangles_z_max_bound_total]
+
         
                 out_triangles.Destroy()                    
                 in_boundaries.Destroy()
@@ -214,7 +247,7 @@ class ElevationMesh(object):
                 in_triangles_layer = in_triangles.GetLayer()
         
                 if in_triangles_layer.GetFeatureCount() > 0:
-                    self.conv_triangle_shape_to_x3d(in_triangles_layer, out_mesh_filename, indexed_colors)
+                    self.conv_triangle_shape_to_x3d(in_triangles_layer, out_mesh_filename, indexed_colors, scale_xy, exageration_z, projection, positioning, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_bound_total)
         
                 in_triangles.Destroy()
         
@@ -232,6 +265,7 @@ class ElevationMesh(object):
     def parse_polygon(self, in_boundary_polygon, in_dem, in_ortho, out_triangles_layer, out_triangles_layer_feature_defn, in_dem_nodata_ext, in_ortho_nodata_ext, in_dem_res_x, in_dem_res_y, in_dem_extent_x_min, in_dem_extent_x_max, in_dem_extent_y_min, in_dem_extent_y_max, in_dem_cols, in_dem_rows,
             in_ortho_extent_x_min, in_ortho_extent_x_max, in_ortho_extent_y_min, in_ortho_extent_y_max, in_ortho_res_x, in_ortho_res_y, in_ortho_cols, in_ortho_rows, coloring_mode):
 
+        logger.info('parsing polygon')
 
 
         triangle_cnt=0
@@ -243,6 +277,13 @@ class ElevationMesh(object):
         in_dem_clip_val_min = 0
         in_dem_clip_val_max = 8000
         
+        out_triangles_x_min_poly_total = 999999999
+        out_triangles_x_max_poly_total = -999999999
+        out_triangles_y_min_poly_total = 999999999
+        out_triangles_y_max_poly_total = -999999999
+        out_triangles_z_min_poly_total = 999999999
+        out_triangles_z_max_poly_total = -999999999
+
 
         in_boundary_polygon_geom_type = in_boundary_polygon.GetGeometryName()
         #logger.info("in_boundary_polygon_geom_type=%s", in_boundary_polygon_geom_type)
@@ -593,6 +634,20 @@ class ElevationMesh(object):
                                                     out_triangles_feature.SetField("C_Z", round(point_c_z,16))
         
         
+                                                    #out_triangles_x_min = min(round(point_a_x,16), round(point_b_x,16), round(point_c_x,16))
+                                                    #out_triangles_x_max = max(round(point_a_x,16), round(point_b_x,16), round(point_c_x,16))
+                                                    #out_triangles_y_min = min(round(point_a_y,16), round(point_b_y,16), round(point_c_y,16))
+                                                    #out_triangles_y_max = max(round(point_a_y,16), round(point_b_y,16), round(point_c_y,16))                                                   
+                                                    out_triangles_z_min = min(round(point_a_z,16), round(point_b_z,16), round(point_c_z,16))
+                                                    out_triangles_z_max = max(round(point_a_z,16), round(point_b_z,16), round(point_c_z,16))
+                                                    
+                                                    #out_triangles_x_min_poly_total = min(out_triangles_x_min, out_triangles_x_min_total)
+                                                    #out_triangles_x_max_poly_total = max(out_triangles_x_max, out_triangles_x_max_total)
+                                                    #out_triangles_y_min_poly_total = min(out_triangles_y_min, out_triangles_y_min_total)
+                                                    #out_triangles_y_max_poly_total = max(out_triangles_y_max, out_triangles_y_max_total)
+                                                    out_triangles_z_min_poly_total = min(out_triangles_z_min, out_triangles_z_min_poly_total)
+                                                    out_triangles_z_max_poly_total = max(out_triangles_z_max, out_triangles_z_max_poly_total)
+                                                    
                                                     
                                                     if coloring_mode == 'height':
                                                            
@@ -669,7 +724,12 @@ class ElevationMesh(object):
                                     except:
                                         pass
     
-        return out_triangles_layer
+    
+        out_triangles_minmax_poly_total = [out_triangles_x_min_poly_total, out_triangles_x_max_poly_total, 
+                                            out_triangles_y_min_poly_total, out_triangles_y_max_poly_total, 
+                                            out_triangles_z_min_poly_total, out_triangles_z_max_poly_total]
+    
+        return out_triangles_layer, out_triangles_minmax_poly_total
                                                     
                                                
 
@@ -737,8 +797,17 @@ class ElevationMesh(object):
     
 
 
-    def ogr_to_elevation_mesh(self, in_dem, in_ortho, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, out_triangles_layer, indexed_colors=True, coloring_mode='ortho'):
+    def ogr_to_elevation_mesh(self, in_dem, in_ortho, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, out_triangles_layer, indexed_colors, coloring_mode):
+
+        logger.info('ogr to elevation mesh')
         
+        out_triangles_x_min_geom_total = 999999999
+        out_triangles_x_max_geom_total = -999999999
+        out_triangles_y_min_geom_total = 999999999
+        out_triangles_y_max_geom_total = -999999999
+        out_triangles_z_min_geom_total = 999999999
+        out_triangles_z_max_geom_total = -999999999
+
         
 
         out_triangles_layer_feature_defn = out_triangles_layer.GetLayerDefn()
@@ -793,8 +862,19 @@ class ElevationMesh(object):
         in_geometry_geom_type = in_geometry.GetGeometryName()
 
         if in_geometry_geom_type.upper() == "POLYGON":
-            out_triangles_layer = self.parse_polygon(in_geometry, in_dem, in_ortho, out_triangles_layer, out_triangles_layer_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, in_dem_res_x, in_dem_res_y, in_dem_extent_x_min, in_dem_extent_x_max, in_dem_extent_y_min, in_dem_extent_y_max, in_dem_cols, in_dem_rows,
+            out_triangles_layer, out_triangles_minmax_poly_total = self.parse_polygon(in_geometry, in_dem, in_ortho, out_triangles_layer, out_triangles_layer_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, in_dem_res_x, in_dem_res_y, in_dem_extent_x_min, in_dem_extent_x_max, in_dem_extent_y_min, in_dem_extent_y_max, in_dem_cols, in_dem_rows,
                     in_ortho_extent_x_min, in_ortho_extent_x_max, in_ortho_extent_y_min, in_ortho_extent_y_max, in_ortho_res_x, in_ortho_res_y, in_ortho_cols, in_ortho_rows, coloring_mode)
+
+
+            out_triangles_x_min_poly_total, out_triangles_x_max_poly_total, out_triangles_y_min_poly_total, out_triangles_y_max_poly_total, out_triangles_z_min_poly_total, out_triangles_z_max_poly_total = out_triangles_minmax_poly_total
+
+            out_triangles_x_min_geom_total = min(out_triangles_x_min_geom_total, out_triangles_x_min_poly_total)
+            out_triangles_x_max_geom_total = max(out_triangles_x_max_geom_total, out_triangles_x_max_poly_total)
+            out_triangles_y_min_geom_total = min(out_triangles_y_min_geom_total, out_triangles_y_min_poly_total)
+            out_triangles_y_max_geom_total = max(out_triangles_y_max_geom_total, out_triangles_y_max_poly_total)
+            out_triangles_z_min_geom_total = min(out_triangles_z_min_geom_total, out_triangles_z_min_poly_total)
+            out_triangles_z_max_geom_total = max(out_triangles_z_max_geom_total, out_triangles_z_max_poly_total)
+
 
 
         if in_geometry_geom_type.upper() == "MULTIPOLYGON":
@@ -803,24 +883,39 @@ class ElevationMesh(object):
                 
                 if in_geometry_polygon_id > -1:
 
-                    out_triangles_layer = self.parse_polygon(in_geometry_polygon, in_dem, in_ortho, out_triangles_layer, out_triangles_layer_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, in_dem_res_x, in_dem_res_y, in_dem_extent_x_min, in_dem_extent_x_max, in_dem_extent_y_min, in_dem_extent_y_max, in_dem_cols, in_dem_rows,
+                    out_triangles_layer, out_triangles_minmax_poly_total = self.parse_polygon(in_geometry_polygon, in_dem, in_ortho, out_triangles_layer, out_triangles_layer_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, in_dem_res_x, in_dem_res_y, in_dem_extent_x_min, in_dem_extent_x_max, in_dem_extent_y_min, in_dem_extent_y_max, in_dem_cols, in_dem_rows,
                             in_ortho_extent_x_min, in_ortho_extent_x_max, in_ortho_extent_y_min, in_ortho_extent_y_max, in_ortho_res_x, in_ortho_res_y, in_ortho_cols, in_ortho_rows, coloring_mode)
 
+
+                    out_triangles_x_min_poly_total, out_triangles_x_max_poly_total, out_triangles_y_min_poly_total, out_triangles_y_max_poly_total, out_triangles_z_min_poly_total, out_triangles_z_max_poly_total = out_triangles_minmax_poly_total
+
+                    #out_triangles_x_min_geom_total = min(out_triangles_x_min_geom_total, out_triangles_x_min_poly_total)
+                    #out_triangles_x_max_geom_total = max(out_triangles_x_max_geom_total, out_triangles_x_max_poly_total)
+                    #out_triangles_y_min_geom_total = min(out_triangles_y_min_geom_total, out_triangles_y_min_poly_total)
+                    #out_triangles_y_max_geom_total = max(out_triangles_y_max_geom_total, out_triangles_y_max_poly_total)
+                    out_triangles_z_min_geom_total = min(out_triangles_z_min_geom_total, out_triangles_z_min_poly_total)
+                    out_triangles_z_max_geom_total = max(out_triangles_z_max_geom_total, out_triangles_z_max_poly_total)
 
         
         elevation_minmax = [0,0]
 
         
 
-    
+        out_triangles_minmax_geom_total = [out_triangles_x_min_geom_total, out_triangles_x_max_geom_total, 
+                                        out_triangles_y_min_geom_total, out_triangles_y_max_geom_total, 
+                                        out_triangles_z_min_geom_total, out_triangles_z_max_geom_total]
+
+
+        return out_triangles_minmax_geom_total
 
 
 
 
 
 
+    def conv_triangle_shape_to_x3d(self, in_triangles_layer, out_mesh_filename, indexed_colors, scale_xy, exageration_z, projection, positioning, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_bound_total):
 
-    def conv_triangle_shape_to_x3d(self, in_triangles_layer, out_mesh_filename, indexed_colors=True):
+        logger.info('converting triangle shape to x3d')
       
         in_triangles_feature_count = in_triangles_layer.GetFeatureCount()
         logger.info('feature_count: %s', in_triangles_feature_count)
@@ -1059,15 +1154,25 @@ class ElevationMesh(object):
         
         bbox3d = [triangles_x_min_total, triangles_x_max_total, triangles_y_min_total, triangles_y_max_total, triangles_z_min_total, triangles_z_max_total]
         center_scale_coords=True
-        
-        self.write_x3d(nodecoords_array_clean, coords_arrays_lut_clean, nodecolors_array_clean, colors_arrays_lut_clean, out_mesh, out_mesh_filename, bbox3d, center_scale_coords, indexed_colors)
+
+
+
+        coords_arrays_lut_clean_transform = self.transform_coords(coords_arrays_lut_clean, exageration_z, projection, positioning, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax)
+
+        self.write_x3d(nodecoords_array_clean, coords_arrays_lut_clean, nodecolors_array_clean, colors_arrays_lut_clean, out_mesh, out_mesh_filename, bbox3d, center_scale_coords, indexed_colors, scale_xy, exageration_z, projection, positioning, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_bound_total)
         
         
         out_mesh.close()
 
     
+    def transform_coords(self, coords_arrays_lut_clean, exageration_z, projection, positioning, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax):
+        pass
     
-    def write_x3d(self, nodecoords_array, coords_arrays_lut, nodecolors_array, colors_arrays_lut, out_mesh, out_mesh_filename, bbox3d, center_scale_coords, indexed_colors):
+    
+    def write_x3d(self, nodecoords_array, coords_arrays_lut, nodecolors_array, colors_arrays_lut, out_mesh, out_mesh_filename, bbox3d, center_scale_coords, indexed_colors, scale_xy, exageration_z, projection, positioning, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_bound_total):
+
+        logger.info('writing x3d')
+
         exaggeration_z = 1.0
         
         coords_array_lut_x, coords_array_lut_y, coords_array_lut_z = coords_arrays_lut
@@ -1200,14 +1305,137 @@ class ElevationMesh(object):
         for coord_lut_id, (coord_lut_x, coord_lut_y, coord_lut_z) in enumerate(zip(coords_array_lut_x, coords_array_lut_y, coords_array_lut_z)):
     
             if not numpy.isnan(coord_lut_x):
+
+                in_boundaries_spatialref_projcs = in_boundaries_spatialref.GetAttrValue("PROJCS", 0)
+                in_boundaries_spatialref_geogcs = in_boundaries_spatialref.GetAttrValue("GEOGCS", 0)
+                in_boundaries_spatialref_datum = in_boundaries_spatialref.GetAttrValue("DATUM", 0)
+                in_boundaries_spatialref_spheroid = in_boundaries_spatialref.GetAttrValue("SPHEROID", 0)
+                in_boundaries_spatialref_epsg = in_boundaries_spatialref.GetAttrValue("AUTHORITY", 1)
+                        
+                print(in_boundaries_spatialref_projcs)
+                print(in_boundaries_spatialref_geogcs)
+                print(in_boundaries_spatialref_datum)
+                print(in_boundaries_spatialref_spheroid)
+                print(in_boundaries_spatialref_epsg)
+
                
+                #projection = 'ecef'
+                projection = 'orig'
+
+
+                out_triangles_x_min_bound_total, out_triangles_x_max_bound_total, out_triangles_y_min_bound_total, out_triangles_y_max_bound_total, out_triangles_z_min_bound_total, out_triangles_z_max_bound_total = out_triangles_minmax_bound_total
+                print(out_triangles_minmax_bound_total)
+            
    
-                x_out,y_out,z_out = self.calculate_ecef_from_lla(coord_lut_x, coord_lut_y, coord_lut_z)
-                
-                scale_xy=0.000001
-                scale_z =0.000001
-               
-                out_mesh.write(str(x_out * scale_xy) + ' ' + str(y_out * scale_xy) + ' ' + str(z_out * scale_z) + ' ')
+                if projection == 'ecef':
+
+
+                    if str(in_boundaries_spatialref_projcs).lower() != 'none':
+                        print('PROJECTED')
+
+
+
+
+                        """
+                        source = osr.SpatialReference()
+                        source.ImportFromEPSG(2927)
+
+                        target = osr.SpatialReference()
+                        target.ImportFromEPSG(4326)
+
+                        transform = osr.CoordinateTransformation(source, target)
+
+                        point = ogr.CreateGeometryFromWkt("POINT (1120351.57 741921.42)")
+                        point.Transform(transform)
+
+                        print point.ExportToWkt()
+                        
+
+
+                        
+                        coord_lut_x_wgs84 = []
+                        coord_lut_y_wgs84 = []
+
+                        for x, y in zip(coord_lut_x, coord_lut_y):
+                            pass
+
+                        coord_lut_x = coord_lut_x_wgs84
+                        coord_lut_y = coord_lut_y_wgs84
+                        """
+
+
+                    x_out_orig, y_out_orig, z_out_orig = self.calculate_ecef_from_lla(coord_lut_x, coord_lut_y, coord_lut_z)
+                    scale_xy=0.000001
+                    scale_z =0.000001
+
+                    x_out = x_out_orig * scale_xy
+                    y_out = y_out_orig * scale_xy
+                    z_out = z_out_orig * scale_z
+
+                else:
+
+
+
+                    if positioning == 'center':
+                        
+                        #spatialRef = osr.SpatialReference()
+                        #spatialRef.ImportFromEPSG(2927)         # from EPSG
+                        
+
+                        
+                        
+                        #Length in meters of 1 deg of latitude = always 111.32 km
+                        #Length in meters of 1 deg of longitude = 40075 km * cos( latitude ) / 360
+                        
+                        #in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax
+                        in_boundaries_x_min, in_boundaries_x_max, in_boundaries_y_min, in_boundaries_y_max = in_boundaries_extent
+                        #in_dem_stats_min, in_dem_stats_max = in_dem_stats_minmax
+
+
+                        in_boundaries_x_diff = in_boundaries_x_max - in_boundaries_x_min
+                        in_boundaries_y_diff = in_boundaries_y_max - in_boundaries_y_min
+                        
+
+                        scale_x = 16.0 / in_boundaries_x_diff
+                        scale_y = 16.0 / in_boundaries_y_diff
+                        
+                        if scale_x <= scale_y:
+                            scale_xy = scale_x
+                        else:
+                            scale_xy = scale_y
+
+                        #scale_z = scale_xy
+
+                        if str(in_boundaries_spatialref_projcs).lower() == 'none':
+                            print('UNPROJECTED')
+                            scale_z = scale_xy / 111320.0
+                        else:
+                            scale_z = scale_xy
+
+
+
+                        x_out_orig, y_out_orig, z_out_orig = coord_lut_x, coord_lut_y, coord_lut_z
+
+                        x_out = (x_out_orig - ((in_boundaries_x_min + in_boundaries_x_max) / 2)) * scale_xy
+                        y_out = (y_out_orig - ((in_boundaries_y_min + in_boundaries_y_max) / 2)) * scale_xy
+                        z_out = (z_out_orig - ((out_triangles_z_min_bound_total + out_triangles_z_max_bound_total) / 2))  * scale_z
+
+
+
+                    else:
+                        x_out_orig, y_out_orig, z_out_orig = coord_lut_x, coord_lut_y, coord_lut_z
+
+                        scale_xy=10
+                        scale_z =0.001
+
+                        x_out = x_out_orig * scale_xy
+                        y_out = y_out_orig * scale_xy
+                        z_out = z_out_orig * scale_z
+
+
+
+                exaggeration_z = 1.0
+                out_mesh.write(str(x_out) + ' ' + str(y_out) + ' ' + str(z_out * exaggeration_z) + ' ')
 
             else:
                 break

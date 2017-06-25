@@ -28,4 +28,7 @@ srtm3='./demodata/srtm3_n049_e011_3arc_v2_clip.tif'
 bluemarble='./demodata/bmng_200407_21600x21600_c1_clip.tif'
 
 elevation = mesh.ElevationMesh()
-elevation.generate_mesh(dem=srtm3, ortho=bluemarble, bound=osm, mesh_prefix='pottenstein')
+#elevation.generate_mesh(dem=srtm3, ortho=bluemarble, bound=osm, mesh_prefix='pottenstein')
+
+
+elevation.generate_mesh(dem=srtm3, ortho=bluemarble, bound=osm, mesh_prefix='pottenstein', projection='orig', positioning='center', out_shape=True)

@@ -1,0 +1,3 @@
+- render only specific tile
+- support 4d coords (animation)
+- support different formats (vtk, json/three.js

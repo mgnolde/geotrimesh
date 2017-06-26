@@ -3,6 +3,11 @@
 *.tar.gz
 *.zip
 *.gz
+*.aux.xml
+*.x3d
+
+todo.txt
+notes.txt
 
 build/
 .git/

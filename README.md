@@ -17,7 +17,7 @@ Usage:
 
 Options:
 
- 	dem
+dem
 | 	dem_nodata
 | 	orthophoto
 | 	orthophoto_nodata

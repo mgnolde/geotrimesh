@@ -8,7 +8,10 @@
 
 todo.txt
 notes.txt
+generate_tests.py
+mesh_sk.py
 
 build/
 .git/
 dist/
+results/

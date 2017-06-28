@@ -3,3 +3,4 @@ setup.cfg
 setup.py
 geotrimesh/__init__.py
 geotrimesh/mesh.py
+geotrimesh/mesh_sk.py

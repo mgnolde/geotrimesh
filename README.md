@@ -15,21 +15,22 @@ Usage:
 
 
 
-| Options:
-| 	dem,
+Options:
+
+| 	dem
 | 	dem_nodata
-| 	orthophoto,
-| 	orthophoto_nodata,
-| 	boundaries,
-| 	tiles_size,
-| 	tiles_bbox,
-| 	mesh_prefix,
-| 	mesh_path,
-| 	mesh_shapefile,
-| 	scale_xy,
-| 	z_exaggeration,
-| 	projection,
-| 	centering,
-| 	indexed_colors,
-| 	coloring_mode,
+| 	orthophoto
+| 	orthophoto_nodata
+| 	boundaries
+| 	tiles_size
+| 	tiles_bbox
+| 	mesh_prefix
+| 	mesh_path
+| 	mesh_shapefile
+| 	scale_xy
+| 	z_exaggeration
+| 	projection
+| 	centering
+| 	indexed_colors
+| 	coloring_mode
 | 	mesh_format

@@ -10,6 +10,8 @@ todo.txt
 notes.txt
 generate_tests.py
 mesh_sk.py
+sync_to_vserver.sh
+generate_tocomee.py
 
 build/
 .git/

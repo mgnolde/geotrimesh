@@ -1,2 +1,34 @@
 - support 4d coords (animation)
 - support different formats (vtk, json/three.js
+
+
+
+Plugin Builder
+Class name: GeoTriMeshQGIS
+Plugin name: geoTriMesh
+Description: Generator for colored 3D meshes from GIS data
+Module name: geotrimesh_qgis
+Version number: 0.94
+Minimum QGUS version: 2.0
+Author/Company: Michael Nolde / flatpolar.org
+Email address: mno@flatpolar.org
+
+About: This is a plugin for making use of the geoTriMesh library from QGIS (see https://github.com/flatpolar/geoTriMesh and flatpolar.org).
+
+Template: Tool button with dialog
+Text for the menu item: Generate 3d mesh
+Menu: Plugins
+
+x Internationalization
+x Help
+x Unit tests
+x Helper scripts
+x Makefile
+x pb_tool
+
+Bug tracker: https://github.com/flatpolar/geoTriMeshQGIS/issues
+Repository: https://github.com/flatpolar/geoTriMeshQGIS
+Home page: http://www.flatpolar.org
+Tags: 3D, export, cad, geometry, X3D, mesh, topology
+
+  Flag the plugin as experimental

@@ -29,6 +29,7 @@ import numpy
 import logging
 from scipy.spatial import Delaunay
 import argparse
+import json
 
 
 logging.basicConfig(level=logging.INFO)
@@ -43,12 +44,15 @@ class ElevationMesh(object):
         pass
 
 
-    def generate_mesh(self, dem=None, orthophoto=None, boundaries=None, dem_nodata=None, orthophoto_nodata=None, tiles_size=None, tiles_bbox=None, mesh_prefix='out', mesh_path=os.getcwd(), mesh_shapefile=False, scale_xy=0.000001, z_exaggeration=1.0, projection='orig', centering=True, indexed_colors=True, coloring_mode='orthophoto', mesh_format='x3d'):
+    def generate_mesh(self, dem=None, orthophoto=None, boundaries=None, dem_nodata=None, orthophoto_nodata=None, tiles_size=None, tiles_bbox=None, mesh_prefix='out', mesh_path=os.path.join(os.getcwd(),'out'), mesh_shapefile=False, scale_xy=0.000001, z_exaggeration=1.0, projection='orig', centering=True, indexed_colors=True, coloring_mode='orthophoto', mesh_format='x3d'):
 
         if dem==None:
             logger.info('A DEM is required. Exiting.')
             sys.exit()
-             
+
+        if not os.path.exists(mesh_path):
+            os.makedirs(mesh_path)
+
         
         logger.info('generating mesh')
         
@@ -59,6 +63,10 @@ class ElevationMesh(object):
         in_orthophoto_nodata_ext=orthophoto_nodata
         out_mesh_filename_prefix=mesh_prefix
         out_mesh_path=mesh_path
+        
+        out_log_filename = os.path.join(out_mesh_path, out_mesh_filename_prefix + '_log' + '.json')
+        
+
         
         
         # this allows GDAL to throw Python Exceptions
@@ -97,10 +105,11 @@ class ElevationMesh(object):
         in_dem_diff_max = max(in_dem_x_diff, in_dem_y_diff)
 
 
+
         if tiles_size == None:
             tiles_size = in_dem_diff_max
         if tiles_bbox == None:
-            tiles_bbox=(in_dem_extent_x_min, in_dem_extent_y_min, in_dem_extent_x_max, in_dem_extent_y_max)
+            tiles_bbox=[in_dem_extent_x_min, in_dem_extent_y_min, in_dem_extent_x_max, in_dem_extent_y_max]
 
 
 
@@ -141,6 +150,7 @@ class ElevationMesh(object):
         for tile_x in range(0, in_dem_tiles_x_total):
             for tile_y in range(0, in_dem_tiles_y_total):
 
+
                 tile_x_coord = in_dem_extent_x_min + tile_x * tiles_size
                 tile_y_coord = in_dem_extent_y_min + tile_y * tiles_size
 
@@ -150,7 +160,7 @@ class ElevationMesh(object):
                 if (tile_x_center >= tiles_bbox_x_min and tile_x_center <= tiles_bbox_x_max and 
                   tile_y_center >= tiles_bbox_y_min and tile_y_center <= tiles_bbox_y_max):
            
-            
+
                     if tiles_size < in_dem_diff_max:
                         out_triangles_filename = os.path.join(out_triangles_path, out_triangles_filename_prefix + '_' + str(tile_x) + '_' + str(tile_y) + '.shp')
                         out_mesh_filename = os.path.join(out_mesh_path, out_mesh_filename_prefix + '_' + str(tile_x) + '_' + str(tile_y) + '.x3d')
@@ -158,8 +168,9 @@ class ElevationMesh(object):
                         out_triangles_filename = os.path.join(out_triangles_path, out_triangles_filename_prefix + '.shp')
                         out_mesh_filename = os.path.join(out_mesh_path, out_mesh_filename_prefix + '.x3d')
             
-            
-            
+
+
+
                     logger.info('create temporary shapefile')
                   
                     ## Calculate triangles from in_boundary and DEM and write them into a Shape-File
@@ -205,7 +216,7 @@ class ElevationMesh(object):
                         in_boundaries_layer = in_boundaries.GetLayer()
 
 
-
+                    in_boundaries_featcount = in_boundaries_layer.GetFeatureCount()
                     in_boundaries_x_min, in_boundaries_x_max, in_boundaries_y_min, in_boundaries_y_max = in_boundaries_layer.GetExtent()
                     in_boundaries_extent = [in_boundaries_x_min, in_boundaries_x_max, in_boundaries_y_min, in_boundaries_y_max]
                     in_boundaries_centroid = [(in_boundaries_x_min + in_boundaries_x_max) / 2, (in_boundaries_y_min + in_boundaries_y_max) / 2]
@@ -214,6 +225,7 @@ class ElevationMesh(object):
             
             
             
+          
             
                     
                     ## Open output vector shape
@@ -286,10 +298,22 @@ class ElevationMesh(object):
                     logger.info('iterate over geometries in boundaries vector file')
             
 
-                    for in_boundaries_feat in in_boundaries_layer:
+                    for in_boundaries_feat_id, in_boundaries_feat in enumerate(in_boundaries_layer):
           
                         in_boundaries_geom = in_boundaries_feat.GetGeometryRef()
                         in_boundaries_geomtype = in_boundaries_geom.GetGeometryName()
+
+
+                        status_perc = (((tile_x * tile_y * in_boundaries_feat_id) + in_boundaries_feat_id) * 100) / (in_dem_tiles_x_total * in_dem_tiles_y_total * in_boundaries_featcount)
+                        status_desc = 'Calculating tile ' + str((tile_x * tile_y) + tile_y) + ' of ' + str(in_dem_tiles_x_total * in_dem_tiles_y_total)
+                        status_dict = {'percent': status_perc,
+                                    'status_desc': status_desc }
+
+                        with open(out_log_filename, 'w') as logfile:
+                            json.dump(status_dict, logfile)
+            
+
+
             
                         #print(in_boundaries_spatialref.GetAttrValue("PROJCS", 0))
             
@@ -344,7 +368,7 @@ class ElevationMesh(object):
                         if os.path.exists(out_triangles_filename):
                             in_triangles_driver.DeleteDataSource(out_triangles_filename)
                     
-            
+                    os.remove(out_log_filename)
         
 
 
@@ -746,7 +770,7 @@ class ElevationMesh(object):
                                                     
                                                     
                                                    
-                                                    if coloring_mode == 'height':
+                                                    if coloring_mode == 'elevation':
 
                                                         in_dem_stats_min, in_dem_stats_max = in_dem_stats_minmax
                                                         

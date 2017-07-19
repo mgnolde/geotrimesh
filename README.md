@@ -14,6 +14,12 @@ Usage:
 ![alt text](./demodata/sample.png "Himalaya")
 *Tile of the TOCOMEE dataset (imported into Blender), created with geoTriMesh*
 
+![alt text](./demodata/sample2.png "Pottenstein colored")
+*City of Pottenstein, colored with Blue Marble Next Generation (imported into Paraview)*
+
+![alt text](./demodata/sample3.png "Pottenstein mesh")
+*City of Pottenstein  (imported into Paraview)*
+
 
 
 Options:

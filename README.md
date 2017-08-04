@@ -10,16 +10,16 @@ Usage:
 	elevation = mesh.ElevationMesh()
 	elevation.generate_mesh(dem='srtm3.tif', orthophoto='bluemarble.tif', boundaries='osm.shp', mesh_prefix='sample')
 
-![alt text](./demodata/sample.png "Himalaya")
+![alt text](./demodata/sample_lq.png "Himalaya")
 *Tile of the TOCOMEE dataset (visualized in Blender), created with geoTriMesh*
 
-![alt text](./demodata/sample3.png "Pottenstein mesh")
+![alt text](./demodata/sample3_lq.png "Pottenstein mesh")
 *Mesh of city of Pottenstein with 5x z-exaggeration  (visualized in Meshlab)*
 
-![alt text](./demodata/sample4.png "Pottenstein mesh detail")
+![alt text](./demodata/sample4_lq.png "Pottenstein mesh detail")
 *Detail mesh view*
 
-![alt text](./demodata/sample5.png "Globe")
+![alt text](./demodata/sample5_lq.png "Globe")
 *Complete TOCOMEE dataset (crude resolution), created with geoTriMesh
 
 

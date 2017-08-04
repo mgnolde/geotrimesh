@@ -20,7 +20,7 @@ Usage:
 *Detail mesh view*
 
 ![alt text](./demodata/sample5_lq.png "Globe")
-*Complete TOCOMEE dataset (crude resolution), created with geoTriMesh
+*Complete TOCOMEE dataset (crude resolution), created with geoTriMesh*
 
 
 

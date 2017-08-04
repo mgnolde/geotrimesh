@@ -10,15 +10,17 @@ Usage:
 	elevation = mesh.ElevationMesh()
 	elevation.generate_mesh(dem='srtm3.tif', orthophoto='bluemarble.tif', boundaries='osm.shp', mesh_prefix='sample')
 
-
 ![alt text](./demodata/sample.png "Himalaya")
-*Tile of the TOCOMEE dataset (imported into Blender), created with geoTriMesh*
-
-![alt text](./demodata/sample2.png "Pottenstein colored")
-*City of Pottenstein, colored with Blue Marble Next Generation (imported into Paraview)*
+*Tile of the TOCOMEE dataset (visualized in Blender), created with geoTriMesh*
 
 ![alt text](./demodata/sample3.png "Pottenstein mesh")
-*City of Pottenstein  (imported into Paraview)*
+*Mesh of city of Pottenstein with 5x z-exaggeration  (visualized in Meshlab)*
+
+![alt text](./demodata/sample4.png "Pottenstein mesh detail")
+*Detail mesh view*
+
+![alt text](./demodata/sample5.png "Globe")
+*Complete TOCOMEE dataset (crude resolution), created with geoTriMesh
 
 
 

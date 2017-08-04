@@ -30,6 +30,7 @@ import logging
 from scipy.spatial import Delaunay
 import argparse
 import json
+import time
 
 
 logging.basicConfig(level=logging.INFO)
@@ -304,13 +305,13 @@ class ElevationMesh(object):
                         in_boundaries_geomtype = in_boundaries_geom.GetGeometryName()
 
 
-                        status_perc = (((tile_x * tile_y * in_boundaries_feat_id) + in_boundaries_feat_id) * 100) / (in_dem_tiles_x_total * in_dem_tiles_y_total * in_boundaries_featcount)
-                        status_desc = 'Calculating tile ' + str((tile_x * tile_y) + tile_y) + ' of ' + str(in_dem_tiles_x_total * in_dem_tiles_y_total)
-                        status_dict = {'percent': status_perc,
-                                    'status_desc': status_desc }
+                        #status_perc = (((tile_x * tile_y * in_boundaries_feat_id) + in_boundaries_feat_id) * 100) / (in_dem_tiles_x_total * in_dem_tiles_y_total * in_boundaries_featcount)
+                        #status_desc = 'Calculating tile ' + str((tile_x * tile_y) + tile_y) + ' of ' + str(in_dem_tiles_x_total * in_dem_tiles_y_total)
+                        #status_dict = {'percent': status_perc,
+                        #            'status_desc': status_desc }
 
-                        with open(out_log_filename, 'w') as logfile:
-                            json.dump(status_dict, logfile)
+                        #with open(out_log_filename, 'w') as logfile:
+                        #    json.dump(status_dict, logfile)
             
 
 
@@ -333,7 +334,7 @@ class ElevationMesh(object):
     
     
                         if in_geometry != None and str(in_geometry).upper() != 'GEOMETRYCOLLECTION EMPTY':
-                            out_triangles_minmax_geom_total = self.ogr_to_elevation_mesh(in_dem, in_orthophoto, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_orthophoto_nodata_ext, out_triangles_layer, indexed_colors, coloring_mode, in_dem_stats_minmax, mesh_format)
+                            out_triangles_minmax_geom_total = self.ogr_to_elevation_mesh(in_dem, in_orthophoto, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_orthophoto_nodata_ext, out_triangles_layer, indexed_colors, coloring_mode, in_dem_stats_minmax, mesh_format, out_log_filename)
                             
     
                             out_triangles_x_min_geom_total, out_triangles_x_max_geom_total, out_triangles_y_min_geom_total, out_triangles_y_max_geom_total, out_triangles_z_min_geom_total, out_triangles_z_max_geom_total = out_triangles_minmax_geom_total
@@ -375,7 +376,7 @@ class ElevationMesh(object):
 
 
     def parse_polygon(self, in_in_boundary_polygon, in_dem, in_orthophoto, out_triangles_layer, out_triangles_layer_feature_defn, in_dem_nodata_ext, in_orthophoto_nodata_ext, in_dem_res_x, in_dem_res_y, in_dem_extent_x_min, in_dem_extent_x_max, in_dem_extent_y_min, in_dem_extent_y_max, in_dem_cols, in_dem_rows,
-            in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, mesh_format):
+            in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, mesh_format, out_log_filename):
 
         logger.info('parsing polygon')
 
@@ -556,13 +557,29 @@ class ElevationMesh(object):
     
     
         for row in range(0, in_dem_array_rows):
+
+
+            if out_log_filename != None:
+
+                point_upperleft_y = in_dem_clip_row_max_y - ((row) * in_dem_res_y) - (0.5 * in_dem_res_y)
+                in_dem_extent_y_dist = in_dem_extent_y_max - in_dem_extent_y_min
+                point_upperleft_y_rel = point_upperleft_y - in_dem_extent_y_min
+                
+                status_perc = 100 - ((point_upperleft_y_rel * 100) / in_dem_extent_y_dist)
+                #status_perc = (((tile_x * tile_y * in_boundaries_feat_id) + in_boundaries_feat_id) * 100) / (in_dem_tiles_x_total * in_dem_tiles_y_total * in_boundaries_featcount)
+                status_desc = 'Calculating row ' + str(row) + ' of ' + str(in_dem_array_rows)
+                status_dict = {'percent': status_perc,
+                            'status_desc': status_desc }
+
+                with open(out_log_filename, 'w') as logfile:
+                    json.dump(status_dict, logfile)
+
     
             for col in range(0, in_dem_array_cols):
-                
-    
-                
 
+                #time.sleep(0.2)
 
+                
                 ## in case the current pixel is a nodata pixel, use an average height value
                 #if int(round(in_dem_array_clip[row,col],0)) == in_dem_nodata:
                 #    in_dem_array_clip[row,col] = -32768
@@ -922,7 +939,7 @@ class ElevationMesh(object):
     
 
 
-    def ogr_to_elevation_mesh(self, in_dem, in_orthophoto, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, out_triangles_layer, indexed_colors, coloring_mode, in_dem_stats_minmax, mesh_format):
+    def ogr_to_elevation_mesh(self, in_dem, in_orthophoto, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, out_triangles_layer, indexed_colors, coloring_mode, in_dem_stats_minmax, mesh_format, out_log_filename):
 
         logger.info('ogr to elevation mesh')
         
@@ -991,7 +1008,7 @@ class ElevationMesh(object):
 
         if in_geometry_geom_type.upper() == "POLYGON":
             out_triangles_layer, out_triangles_minmax_poly_total = self.parse_polygon(in_geometry, in_dem, in_orthophoto, out_triangles_layer, out_triangles_layer_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, in_dem_res_x, in_dem_res_y, in_dem_extent_x_min, in_dem_extent_x_max, in_dem_extent_y_min, in_dem_extent_y_max, in_dem_cols, in_dem_rows,
-                    in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, mesh_format)
+                    in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, mesh_format, out_log_filename)
 
 
             out_triangles_x_min_poly_total, out_triangles_x_max_poly_total, out_triangles_y_min_poly_total, out_triangles_y_max_poly_total, out_triangles_z_min_poly_total, out_triangles_z_max_poly_total = out_triangles_minmax_poly_total
@@ -1012,7 +1029,7 @@ class ElevationMesh(object):
                 if in_geometry_polygon_id > -1:
 
                     out_triangles_layer, out_triangles_minmax_poly_total = self.parse_polygon(in_geometry_polygon, in_dem, in_orthophoto, out_triangles_layer, out_triangles_layer_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, in_dem_res_x, in_dem_res_y, in_dem_extent_x_min, in_dem_extent_x_max, in_dem_extent_y_min, in_dem_extent_y_max, in_dem_cols, in_dem_rows,
-                            in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, mesh_format)
+                            in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, mesh_format, out_log_filename)
 
 
                     out_triangles_x_min_poly_total, out_triangles_x_max_poly_total, out_triangles_y_min_poly_total, out_triangles_y_max_poly_total, out_triangles_z_min_poly_total, out_triangles_z_max_poly_total = out_triangles_minmax_poly_total
@@ -1424,6 +1441,15 @@ class ElevationMesh(object):
 
                         x_out = (x_out_orig - ((in_boundaries_x_min + in_boundaries_x_max) / 2)) * scale_xy
                         y_out = (y_out_orig - ((in_boundaries_y_min + in_boundaries_y_max) / 2)) * scale_xy
+
+
+                        #logger.info('z_out: %s', z_out)
+                        logger.info('z_out_orig: %s', z_out_orig)
+                        logger.info('out_triangles_z_min_boundaries_total: %s', out_triangles_z_min_boundaries_total)
+                        logger.info('out_triangles_z_max_boundaries_total: %s', out_triangles_z_max_boundaries_total)
+                        logger.info('scale_z: %s', scale_z)
+                        logger.info('z_exaggeration: %s', z_exaggeration)
+
                         z_out = ((z_out_orig - ((out_triangles_z_min_boundaries_total + out_triangles_z_max_boundaries_total) / 2))  * scale_z) * z_exaggeration
 
 

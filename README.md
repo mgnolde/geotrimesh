@@ -1,7 +1,9 @@
 # geoTriMesh
 
 
-Converts GIS data to colored 3D meshes (X3D)
+geoTriMesh converts GIS data to colored 3D meshes (X3D).
+The library is intended to help to bridge the gap between geospatial data and 3D modelling.
+
 
 Installation:
 
@@ -13,20 +15,7 @@ Usage:
 	from geotrimesh import mesh
 
 	elevation = mesh.ElevationMesh()
-	elevation.generate_mesh(dem='srtm3.tif', orthophoto='bluemarble.tif', boundaries='osm.shp', mesh_prefix='sample')
-
-![alt text](./demodata/sample_lq.png "Himalaya")
-*Tile of the TOCOMEE dataset (visualized in Blender), created with geoTriMesh*
-
-![alt text](./demodata/sample3_lq.png "Pottenstein mesh")
-*Mesh of city of Pottenstein with 5x z-exaggeration  (visualized in Meshlab)*
-
-![alt text](./demodata/sample4_lq.png "Pottenstein mesh detail")
-*Detail mesh view*
-
-![alt text](./demodata/sample5_lq.png "Globe")
-*Complete TOCOMEE dataset (crude resolution), created with geoTriMesh*
-
+	elevation.generate_mesh(dem='srtm3.tif', orthophoto='bluemarble.tif', boundaries='osm.shp')
 
 
 Options:
@@ -48,3 +37,25 @@ dem
 | 	indexed_colors
 | 	coloring_mode
 | 	mesh_format
+
+
+
+
+![alt text](./demodata/sample2_lq.png "Pottenstein mesh")
+*Mesh of city of Pottenstein with 5x z-exaggeration, X3D, visualized in Meshlab*
+
+![alt text](./demodata/sample7_lq.png "Tan-DEM-X")
+*TanDEM-X (South Dakota demo data), X3D, visualized in Blender*
+
+![alt text](./demodata/sample6_lq.png "Globe")
+*Mesh of city of Pottenstein, Matplotlib/mplot3D output*
+
+![alt text](./demodata/sample5_lq.png "Globe")
+*Complete TOCOMEE dataset (crude resolution), visualized in Blender*
+
+
+Download the complete TOCOMEE dataset (made with geoTriMesh) here: <http://www.flatpolar.org/tocomee.html>
+
+
+
+

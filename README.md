@@ -3,6 +3,11 @@
 
 Converts GIS data to colored 3D meshes (X3D)
 
+Installation:
+
+	pip install geotrimesh
+
+
 Usage:
 
 	from geotrimesh import mesh

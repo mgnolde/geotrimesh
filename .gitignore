@@ -12,8 +12,11 @@ generate_tests.py
 mesh_sk.py
 sync_to_vserver.sh
 generate_tocomee.py
+generate_sample_tandem.py
 
 build/
 .git/
 dist/
 results/
+mat/
+sandbox/

@@ -46,7 +46,7 @@ class ElevationMesh(object):
 
 
     def generate_mesh(self, dem=None, orthophoto=None, boundaries=None, dem_nodata=None, orthophoto_nodata=None, tiles_size=None, tiles_bbox=None, mesh_prefix='out', mesh_path=os.path.join(os.getcwd(),'out'), mesh_shapefile=False, scale_xy=0.000001, z_exaggeration=1.0, projection='orig', centering=True, indexed_colors=True, coloring_mode='orthophoto', mesh_format='x3d'):
-
+        
         if dem==None:
             logger.info('A DEM is required. Exiting.')
             sys.exit()
@@ -101,6 +101,7 @@ class ElevationMesh(object):
         in_dem_srs=osr.SpatialReference(wkt=in_dem_prj)
 
 
+
         in_dem_x_diff = in_dem_extent_x_max - in_dem_extent_x_min
         in_dem_y_diff = in_dem_extent_y_max - in_dem_extent_y_min
         in_dem_diff_max = max(in_dem_x_diff, in_dem_y_diff)
@@ -123,21 +124,26 @@ class ElevationMesh(object):
      
         if in_orthophoto_filename != None:
             in_orthophoto = gdal.Open(in_orthophoto_filename)
+
+            #GetStatistics(self, int approx_ok, int force) 
+            in_orthophoto_red_stats = in_orthophoto.GetRasterBand(1).GetStatistics(0,1)
+            in_orthophoto_green_stats = in_orthophoto.GetRasterBand(2).GetStatistics(0,1)
+            in_orthophoto_blue_stats = in_orthophoto.GetRasterBand(3).GetStatistics(0,1)
+            in_orthophoto_stats_minmax = [[in_orthophoto_red_stats[0], in_orthophoto_red_stats[1]], [in_orthophoto_green_stats[0], in_orthophoto_green_stats[1]], [in_orthophoto_blue_stats[0], in_orthophoto_blue_stats[1]]]           
+
         else:
             in_orthophoto = None
+            in_orthophoto_stats_minmax = [[0, 255], [0, 255], [0, 255]]           
 
            
 
 
 
         in_dem_band = in_dem.GetRasterBand(1)
-        in_dem_stats = in_dem_band.GetStatistics( True, True )
-
-        if in_dem_stats != None:
-            in_dem_stats_minmax = [in_dem_stats[0], in_dem_stats[1]]
-        else:
-            in_dem_stats_minmax = [-418, 8848] # Shore of Dead Sea, Mt. Everest
-            
+        
+        #GetStatistics(self, int approx_ok, int force) 
+        in_dem_stats = in_dem_band.GetStatistics(0, 1)
+        in_dem_stats_minmax = [in_dem_stats[0], in_dem_stats[1]]           
 
         tiles_bbox_x_min, tiles_bbox_y_min, tiles_bbox_x_max, tiles_bbox_y_max = tiles_bbox
 
@@ -164,10 +170,10 @@ class ElevationMesh(object):
 
                     if tiles_size < in_dem_diff_max:
                         out_triangles_filename = os.path.join(out_triangles_path, out_triangles_filename_prefix + '_' + str(tile_x) + '_' + str(tile_y) + '.shp')
-                        out_mesh_filename = os.path.join(out_mesh_path, out_mesh_filename_prefix + '_' + str(tile_x) + '_' + str(tile_y) + '.x3d')
+                        out_mesh_filename = os.path.join(out_mesh_path, out_mesh_filename_prefix + '_' + str(tile_x) + '_' + str(tile_y) + '.' + mesh_format)
                     else:
                         out_triangles_filename = os.path.join(out_triangles_path, out_triangles_filename_prefix + '.shp')
-                        out_mesh_filename = os.path.join(out_mesh_path, out_mesh_filename_prefix + '.x3d')
+                        out_mesh_filename = os.path.join(out_mesh_path, out_mesh_filename_prefix + '.' + mesh_format)
             
 
 
@@ -334,7 +340,7 @@ class ElevationMesh(object):
     
     
                         if in_geometry != None and str(in_geometry).upper() != 'GEOMETRYCOLLECTION EMPTY':
-                            out_triangles_minmax_geom_total = self.ogr_to_elevation_mesh(in_dem, in_orthophoto, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_orthophoto_nodata_ext, out_triangles_layer, indexed_colors, coloring_mode, in_dem_stats_minmax, mesh_format, out_log_filename)
+                            out_triangles_minmax_geom_total = self.ogr_to_elevation_mesh(in_dem, in_orthophoto, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_orthophoto_nodata_ext, out_triangles_layer, indexed_colors, coloring_mode, in_dem_stats_minmax, in_orthophoto_stats_minmax, mesh_format, out_log_filename)
                             
     
                             out_triangles_x_min_geom_total, out_triangles_x_max_geom_total, out_triangles_y_min_geom_total, out_triangles_y_max_geom_total, out_triangles_z_min_geom_total, out_triangles_z_max_geom_total = out_triangles_minmax_geom_total
@@ -369,14 +375,17 @@ class ElevationMesh(object):
                         if os.path.exists(out_triangles_filename):
                             in_triangles_driver.DeleteDataSource(out_triangles_filename)
                     
-                    os.remove(out_log_filename)
+                    try:
+                        os.remove(out_log_filename)
+                    except:
+                        pass
         
 
 
 
 
     def parse_polygon(self, in_in_boundary_polygon, in_dem, in_orthophoto, out_triangles_layer, out_triangles_layer_feature_defn, in_dem_nodata_ext, in_orthophoto_nodata_ext, in_dem_res_x, in_dem_res_y, in_dem_extent_x_min, in_dem_extent_x_max, in_dem_extent_y_min, in_dem_extent_y_max, in_dem_cols, in_dem_rows,
-            in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, mesh_format, out_log_filename):
+            in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, in_orthophoto_stats_minmax, mesh_format, out_log_filename):
 
         logger.info('parsing polygon')
 
@@ -396,6 +405,11 @@ class ElevationMesh(object):
         out_triangles_y_max_poly_total = -999999999
         out_triangles_z_min_poly_total = 999999999
         out_triangles_z_max_poly_total = -999999999
+
+        red_minmax, green_minmax, blue_minmax = in_orthophoto_stats_minmax
+        red_min, red_max = red_minmax
+        green_min, green_max = green_minmax
+        blue_min, blue_max = blue_minmax
 
 
         in_in_boundary_polygon_geom_type = in_in_boundary_polygon.GetGeometryName()
@@ -840,7 +854,38 @@ class ElevationMesh(object):
                                                         else:
                                                             red_c, green_c, blue_c = 255,255,255
         
+
+                                                        """
+                                                        orthophoto_is_16bit = True
+
+                                                        if orthophoto_is_16bit == True:
+
+                                                            red_a = (red_a * 100.0 / 65536.0) * 2.55
+                                                            green_a = (green_a * 100.0 / 65536.0) * 2.55
+                                                            blue_a = (blue_a * 100.0 / 65536.0) * 2.55
+                                                            
+                                                            red_b = (red_b * 100.0 / 65536.0) * 2.55
+                                                            green_b = (green_b * 100.0 / 65536.0) * 2.55
+                                                            blue_b = (blue_b * 100.0 / 65536.0) * 2.55
+                                                            
+                                                            red_c = (red_c * 100.0 / 65536.0) * 2.55
+                                                            green_c = (green_c * 100.0 / 65536.0) * 2.55
+                                                            blue_c = (blue_c * 100.0 / 65536.0) * 2.55
+                                                        """
+
                                                         
+                                                        ## spread color table
+                                                        red_a = ((red_a - red_min) * 100 / (red_max - red_min)) * 2.55
+                                                        blue_a = ((blue_a - blue_min) * 100 / (blue_max - blue_min)) * 2.55
+                                                        green_a = ((green_a - green_min) * 100 / (green_max - green_min)) * 2.55
+                                                        red_b = ((red_b - red_min) * 100 / (red_max - red_min)) * 2.55
+                                                        blue_b = ((blue_b - blue_min) * 100 / (blue_max - blue_min)) * 2.55
+                                                        green_b = ((green_b - green_min) * 100 / (green_max - green_min)) * 2.55
+                                                        red_c = ((red_c - red_min) * 100 / (red_max - red_min)) * 2.55
+                                                        blue_c = ((blue_c - blue_min) * 100 / (blue_max - blue_min)) * 2.55
+                                                        green_c = ((green_c - green_min) * 100 / (green_max - green_min)) * 2.55
+
+
                                                         #red_a_perc = round((red_a * 100.0 / 255.0) / 100.0,2)
         
                                                         out_triangles_feature.SetField("A_RED", (red_a * 100.0 / 255.0) / 100.0)
@@ -939,7 +984,7 @@ class ElevationMesh(object):
     
 
 
-    def ogr_to_elevation_mesh(self, in_dem, in_orthophoto, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, out_triangles_layer, indexed_colors, coloring_mode, in_dem_stats_minmax, mesh_format, out_log_filename):
+    def ogr_to_elevation_mesh(self, in_dem, in_orthophoto, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, out_triangles_layer, indexed_colors, coloring_mode, in_dem_stats_minmax, in_orthophoto_stats_minmax, mesh_format, out_log_filename):
 
         logger.info('ogr to elevation mesh')
         
@@ -1008,7 +1053,7 @@ class ElevationMesh(object):
 
         if in_geometry_geom_type.upper() == "POLYGON":
             out_triangles_layer, out_triangles_minmax_poly_total = self.parse_polygon(in_geometry, in_dem, in_orthophoto, out_triangles_layer, out_triangles_layer_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, in_dem_res_x, in_dem_res_y, in_dem_extent_x_min, in_dem_extent_x_max, in_dem_extent_y_min, in_dem_extent_y_max, in_dem_cols, in_dem_rows,
-                    in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, mesh_format, out_log_filename)
+                    in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, in_orthophoto_stats_minmax, mesh_format, out_log_filename)
 
 
             out_triangles_x_min_poly_total, out_triangles_x_max_poly_total, out_triangles_y_min_poly_total, out_triangles_y_max_poly_total, out_triangles_z_min_poly_total, out_triangles_z_max_poly_total = out_triangles_minmax_poly_total
@@ -1029,7 +1074,7 @@ class ElevationMesh(object):
                 if in_geometry_polygon_id > -1:
 
                     out_triangles_layer, out_triangles_minmax_poly_total = self.parse_polygon(in_geometry_polygon, in_dem, in_orthophoto, out_triangles_layer, out_triangles_layer_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, in_dem_res_x, in_dem_res_y, in_dem_extent_x_min, in_dem_extent_x_max, in_dem_extent_y_min, in_dem_extent_y_max, in_dem_cols, in_dem_rows,
-                            in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, mesh_format, out_log_filename)
+                            in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, in_orthophoto_stats_minmax, mesh_format, out_log_filename)
 
 
                     out_triangles_x_min_poly_total, out_triangles_x_max_poly_total, out_triangles_y_min_poly_total, out_triangles_y_max_poly_total, out_triangles_z_min_poly_total, out_triangles_z_max_poly_total = out_triangles_minmax_poly_total
@@ -1277,14 +1322,14 @@ class ElevationMesh(object):
         colors_array_lut_blue_clean = colors_array_lut_blue[numpy.logical_not(numpy.isnan(colors_array_lut_blue))]
         colors_array_lut_alpha_clean = colors_array_lut_alpha[numpy.logical_not(numpy.isnan(colors_array_lut_alpha))]
 
-        """
+        #"""
         ## Just a precaution: If the reference to to color list is higher than the number of colors contained in that list, 
         ## set the reference to the last list item.
 
         nodecolors_false_values = numpy.where(nodecolors_array[:] > len(colors_array_lut_red_clean)-1)
         if len(nodecolors_false_values[0]) > 0:
             nodecolors_array[nodecolors_false_values] = len(colors_array_lut_red_clean)-1
-        """
+        #"""
 
         nodecoords_array_clean = nodecoords_array[numpy.logical_not(numpy.isnan(nodecoords_array))]
         nodecolors_array_clean = nodecolors_array[numpy.logical_not(numpy.isnan(nodecolors_array))]
@@ -1313,6 +1358,9 @@ class ElevationMesh(object):
         if mesh_format.lower() == 'x3d':
             self.write_x3d(nodecoords_array_clean, coords_arrays_lut_clean_trans, nodecolors_array_clean, colors_arrays_lut_clean, out_mesh, out_mesh_filename, aoi3d, center_scale_coords, indexed_colors, scale_xy, z_exaggeration, projection, centering, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_boundaries_total)
         
+        if mesh_format.lower() == 'py':
+            self.write_python_matplotlib(nodecoords_array_clean, coords_arrays_lut_clean_trans, nodecolors_array_clean, colors_arrays_lut_clean, out_mesh, out_mesh_filename, aoi3d, center_scale_coords, indexed_colors, scale_xy, z_exaggeration, projection, centering, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_boundaries_total)
+
         
         out_mesh.close()
 
@@ -1353,7 +1401,7 @@ class ElevationMesh(object):
    
                 if projection == 'ecef':
 
-
+                    ## Input file is projected (not WGS84)
                     if str(in_boundaries_spatialref_projcs).lower() != 'none':
                      
                         #source = osr.SpatialReference()
@@ -1429,6 +1477,7 @@ class ElevationMesh(object):
                         #scale_z = scale_xy
 
                         if str(in_boundaries_spatialref_projcs).lower() == 'none':
+                            # 111320.0: 1 degree on the equator in meters
                             scale_z = scale_xy / 111320.0
                         else:
                             scale_z = scale_xy
@@ -1458,7 +1507,11 @@ class ElevationMesh(object):
                     else:
                         x_out_orig, y_out_orig, z_out_orig = coord_lut_x, coord_lut_y, coord_lut_z
 
-                        scale_z = scale_xy / 111320.0
+                        ## Input file is unprojected (WGS84)
+                        if str(in_boundaries_spatialref_projcs).lower() == 'none':
+                            scale_z = scale_xy / 100000.0 #111320.0
+                        else:
+                            scale_z = scale_xy
 
                         x_out = x_out_orig * scale_xy
                         y_out = y_out_orig * scale_xy
@@ -1470,6 +1523,144 @@ class ElevationMesh(object):
             coords_array_lut_z_trans.append(z_out)
     
         return coords_array_lut_x_trans, coords_array_lut_y_trans, coords_array_lut_z_trans
+
+
+
+    def write_python_matplotlib(self, nodecoords_array, coords_arrays_lut, nodecolors_array, colors_arrays_lut, out_mesh, out_mesh_filename, aoi3d, center_scale_coords, indexed_colors, scale_xy, z_exaggeration, projection, centering, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_boundaries_total):
+        import random
+
+        logger.info('writing maplotlib python file')
+
+        coords_array_lut_x, coords_array_lut_y, coords_array_lut_z = coords_arrays_lut
+
+        print(min(coords_array_lut_x), max(coords_array_lut_x))
+        print(min(coords_array_lut_y), max(coords_array_lut_y))
+        print(min(coords_array_lut_z), max(coords_array_lut_z))
+
+        coords_array_lut_x_dist = max(coords_array_lut_x) - min(coords_array_lut_x)
+        coords_array_lut_y_dist = max(coords_array_lut_y) - min(coords_array_lut_y)
+        coords_array_lut_z_dist = max(coords_array_lut_z) - min(coords_array_lut_z)
+
+        coords_array_lut_dist_max = max(coords_array_lut_x_dist, coords_array_lut_y_dist, coords_array_lut_z_dist)
+
+        coords_array_lut_x_dist_margin = (coords_array_lut_dist_max - coords_array_lut_x_dist) / 2.0
+        coords_array_lut_y_dist_margin = (coords_array_lut_dist_max - coords_array_lut_y_dist) / 2.0
+        coords_array_lut_z_dist_margin = (coords_array_lut_dist_max - coords_array_lut_z_dist) / 2.0
+
+
+        colors_array_lut_red, colors_array_lut_green, colors_array_lut_blue, colors_array_lut_alpha = colors_arrays_lut
+   
+
+    
+        triangles_x_min_total, triangles_x_max_total, triangles_y_min_total, triangles_y_max_total, triangles_z_min_total, triangles_z_max_total = aoi3d
+
+        out_mesh.write('from mpl_toolkits.mplot3d import Axes3D' + '\n')
+        out_mesh.write('import matplotlib.pyplot as plt' + '\n')
+        out_mesh.write('import numpy as np' + '\n')
+        out_mesh.write('from mpl_toolkits.mplot3d.art3d import Poly3DCollection' + '\n')
+        out_mesh.write('from matplotlib.colors import LinearSegmentedColormap' + '\n')
+
+        out_mesh.write('' + '\n')
+
+        out_mesh.write('x = np.array( ' + str(coords_array_lut_x) + ') \n')
+        out_mesh.write('y = np.array( ' + str(coords_array_lut_y) + ') \n')
+        out_mesh.write('z = np.array( ' + str(coords_array_lut_z) + ') \n')
+
+        nodecoords_list = nodecoords_array.tolist()
+        nodecolors_list = nodecolors_array.tolist()
+
+        nodecoords_list_int = map(int, nodecoords_list)
+        nodecolors_list_int = map(int, nodecolors_list)
+        nodecolors_list_int_max = max(nodecolors_list_int)
+
+
+        nodecoords_list_int_triples = []
+        nodecolors_list_int_triples = []
+
+        for i in range(0, len(nodecoords_list_int), 3):
+            nodecoords_list_int_triple = [nodecoords_list_int[i], nodecoords_list_int[i+1], nodecoords_list_int[i+2]]
+            nodecoords_list_int_triples.append(nodecoords_list_int_triple)
+
+            nodecolors_list_int_triple = [nodecolors_list_int[i], nodecolors_list_int[i+1], nodecolors_list_int[i+2]]
+            nodecolors_list_int_triples.append(nodecolors_list_int_triple)
+
+            #print(nodecoords_list_int_triple)
+
+
+        #print(len(nodecoords_list_int_triples))
+        #print(len(nodecolors_list_int_triples))
+        #print(len(coords_array_lut_x_norm))
+        #print(len(nodecoords_list_int_triples))
+        #print(nodecolors_list_int_max)
+
+            
+
+
+        out_mesh.write('' + '\n')
+
+        out_mesh.write('triangles = ' + str(nodecoords_list_int_triples) + '\n')
+
+        out_mesh.write('' + '\n')
+
+        out_mesh.write('col_id_max = ' + str(float(nodecolors_list_int_max)) + '\n')
+
+        cmap_list = []
+        for j_id, j in enumerate(range(0, len(nodecoords_list_int_triples))):
+            cmap_list.append(round(j / float(len(nodecoords_list_int_triples)-1), 3))
+
+        out_mesh.write('' + '\n')
+
+        out_mesh.write('colors = np.array(' + str(cmap_list) + ')' + '\n')
+
+
+
+        colors_rgba = []
+        force_opaque = True
+        
+        
+        for nodecolor_id, nodecolor in enumerate(range(0,len(nodecoords_list_int_triples))):
+
+            node0_index = nodecolors_list_int_triples[nodecolor_id][0]
+            node1_index = nodecolors_list_int_triples[nodecolor_id][1]
+            node2_index = nodecolors_list_int_triples[nodecolor_id][2]
+
+            node1_color_red, node1_color_green, node1_color_blue, node1_color_alpha = [colors_array_lut_red[node0_index], colors_array_lut_green[node0_index], colors_array_lut_blue[node0_index], colors_array_lut_alpha[node0_index]]
+            node2_color_red, node2_color_green, node2_color_blue, node2_color_alpha = [colors_array_lut_red[node1_index], colors_array_lut_green[node1_index], colors_array_lut_blue[node1_index], colors_array_lut_alpha[node1_index]]
+            node3_color_red, node3_color_green, node3_color_blue, node3_color_alpha = [colors_array_lut_red[node2_index], colors_array_lut_green[node2_index], colors_array_lut_blue[node2_index], colors_array_lut_alpha[node2_index]]
+
+            triangle_color_red = (node1_color_red + node2_color_red + node3_color_red) / 3.0
+            triangle_color_green = (node1_color_green + node2_color_green + node3_color_green) / 3.0
+            triangle_color_blue = (node1_color_blue + node2_color_blue + node3_color_blue) / 3.0
+            if force_opaque == False:            
+                triangle_color_alpha = (node1_color_alpha + node2_color_alpha + node3_color_alpha) / 3.0
+            else:
+                triangle_color_alpha = 1.0
+
+            colors_rgba_tuple = (round(float(nodecolor_id) / (len(nodecoords_list_int_triples)-1), 3), (round(triangle_color_red,3), round(triangle_color_green,3), round(triangle_color_blue,3), round(triangle_color_alpha,3)))
+            colors_rgba.append(colors_rgba_tuple)
+
+
+
+        out_mesh.write("cmap = LinearSegmentedColormap.from_list('cmap', " + str(colors_rgba) + ')' + '\n')
+
+        out_mesh.write('' + '\n')
+
+
+        out_mesh.write('fig = plt.figure(figsize=(10,  10), dpi=72.0)' + '\n')
+        out_mesh.write("ax = fig.gca(projection='3d')" + '\n')
+        out_mesh.write('ax.set_xlim([' + str(min(coords_array_lut_x) - coords_array_lut_x_dist_margin) + ',' + str(max(coords_array_lut_x) + coords_array_lut_x_dist_margin) + '])' + '\n')
+        out_mesh.write('ax.set_ylim([' + str(min(coords_array_lut_y) - coords_array_lut_y_dist_margin) + ',' + str(max(coords_array_lut_y) + coords_array_lut_y_dist_margin) + '])' + '\n')
+        out_mesh.write('ax.set_zlim([' + str(min(coords_array_lut_z) - coords_array_lut_z_dist_margin) + ',' + str(max(coords_array_lut_z) + coords_array_lut_z_dist_margin) + '])' + '\n')
+        out_mesh.write("ax.set_aspect('equal')" + '\n')
+        out_mesh.write('collec = ax.plot_trisurf(x, y, z, triangles=triangles, cmap=cmap, linewidth=0.2, antialiased=True, shade=True)' + '\n')
+        out_mesh.write('collec.set_array(colors)' + '\n')
+        # Maximized window
+        #out_mesh.write('mng = plt.get_current_fig_manager()' + '\n')
+        #out_mesh.write('mng.resize(*mng.window.maxsize())' + '\n')
+        out_mesh.write('plt.show()' + '\n')
+
+
+
 
 
 

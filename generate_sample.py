@@ -24,12 +24,12 @@
 import os
 from geotrimesh import mesh
 
-osm = os.path.join('demodata','osm_2017_pottenstein_simple.shp')
-srtm3 = os.path.join('demodata','srtm3_2000_clip_pottenstein.tif')
-gtopo30 = os.path.join('demodata','gtopo30_1996_clip_pottenstein.tif')
-bluemarble = os.path.join('demodata','bmng_2004_clip_pottenstein.tif')
+osm = os.path.join('demodata','osm_2017_pottenstein_simple_25832.shp')
+srtm3 = os.path.join('demodata','srtm3_2000_clip_pottenstein_25832.tif')
+gtopo30 = os.path.join('demodata','gtopo30_1996_clip_pottenstein_25832.tif')
+bluemarble = os.path.join('demodata','bmng_2004_clip_pottenstein_25832.tif')
 
 elevation = mesh.ElevationMesh()
 
 elevation.generate_mesh( dem=gtopo30, orthophoto=bluemarble, boundaries=osm, 
-					     mesh_prefix='pottenstein', z_exaggeration=5)
+					     mesh_prefix='pottenstein', mesh_format='py', centering = False, projection='orig', scale_xy = 1)

@@ -2,7 +2,7 @@ from distutils.core import setup
 setup(
   name = 'geotrimesh',
   packages = ['geotrimesh'],
-  version = '0.9.4',
+  version = '0.9.5',
   description = 'Generator for colored 3D meshes from GIS data',
   author = 'Michael Nolde',
   author_email = 'mno@flatpolar.org',

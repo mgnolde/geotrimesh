@@ -48,7 +48,7 @@ dem
 *TanDEM-X (South Dakota demo data), X3D, visualized in Blender*
 
 ![alt text](./demodata/sample6_lq.png "Globe")
-*Mesh of city of Pottenstein, Matplotlib/mplot3D output*
+*Mesh of city of Pottenstein, Matplotlib/mplot3d output*
 
 ![alt text](./demodata/sample5_lq.png "Globe")
 *Complete TOCOMEE dataset (crude resolution), visualized in Blender*

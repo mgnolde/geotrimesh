@@ -31,5 +31,14 @@ bluemarble = os.path.join('demodata','bmng_2004_clip_pottenstein_25832.tif')
 
 elevation = mesh.ElevationMesh()
 
-elevation.generate_mesh( dem=gtopo30, orthophoto=bluemarble, boundaries=osm, 
-					     mesh_prefix='pottenstein', mesh_format='py', centering = False, projection='orig', scale_xy = 1)
+## Py/Matplotlib
+#elevation.generate_mesh( dem=gtopo30, orthophoto=bluemarble, boundaries=osm, 
+#					     mesh_prefix='pottenstein', mesh_format='py', centering = False, projection='orig', scale_xy = 1)
+
+## VTK
+elevation.generate_mesh( dem=srtm3, orthophoto=bluemarble, boundaries=osm, 
+					     mesh_prefix='pottenstein', mesh_format='vtu', centering = False, projection='orig')
+
+## X3D
+#elevation.generate_mesh( dem=srtm3, orthophoto=bluemarble, boundaries=osm, 
+#					     mesh_prefix='pottenstein', mesh_format='x3d', centering = True, projection='orig')

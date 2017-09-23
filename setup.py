@@ -8,6 +8,6 @@ setup(
   author_email = 'mno@flatpolar.org',
   url = 'https://github.com/flatpolar/geoTriMesh',
   download_url = 'https://github.com/flatpolar/geoTriMesh/archive/master.zip',
-  keywords = ['X3D', 'mesh', 'GIS', 'spatial', 'geo'],
+  keywords = ['X3D', 'mesh', 'GIS', 'spatial', 'geo', 'mplot3d'],
   classifiers = [],
 )

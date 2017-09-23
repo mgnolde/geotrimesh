@@ -1361,6 +1361,9 @@ class ElevationMesh(object):
         if mesh_format.lower() == 'py':
             self.write_python_matplotlib(nodecoords_array_clean, coords_arrays_lut_clean_trans, nodecolors_array_clean, colors_arrays_lut_clean, out_mesh, out_mesh_filename, aoi3d, center_scale_coords, indexed_colors, scale_xy, z_exaggeration, projection, centering, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_boundaries_total)
 
+        if mesh_format.lower() == 'vtu':
+            self.write_vtu(nodecoords_array_clean, coords_arrays_lut_clean_trans, nodecolors_array_clean, colors_arrays_lut_clean, out_mesh, out_mesh_filename, aoi3d, center_scale_coords, indexed_colors, scale_xy, z_exaggeration, projection, centering, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_boundaries_total)
+
         
         out_mesh.close()
 
@@ -1526,8 +1529,192 @@ class ElevationMesh(object):
 
 
 
+
+
+
+    def write_vtu(self, nodecoords_array, coords_arrays_lut, nodecolors_array, colors_arrays_lut, out_mesh, out_mesh_filename, aoi3d, center_scale_coords, indexed_colors, scale_xy, z_exaggeration, projection, centering, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_boundaries_total):
+
+        logger.info('writing vtk')
+       
+        coords_array_lut_x, coords_array_lut_y, coords_array_lut_z = coords_arrays_lut
+        colors_array_lut_red, colors_array_lut_green, colors_array_lut_blue, colors_array_lut_alpha = colors_arrays_lut
+    
+    
+        triangles_x_min_total, triangles_x_max_total, triangles_y_min_total, triangles_y_max_total, triangles_z_min_total, triangles_z_max_total = aoi3d
+        
+        nodecoords_list = nodecoords_array.tolist()
+        nodecolors_list = nodecolors_array.tolist()
+
+        nodecoords_list_int = map(int, nodecoords_list)
+        nodecolors_list_int = map(int, nodecolors_list)
+        nodecolors_list_int_max = max(nodecolors_list_int)
+
+        nodecoords_list_int_triples = []
+        nodecolors_list_int_triples = []
+
+        for i in range(0, len(nodecoords_list_int), 3):
+            nodecoords_list_int_triple = [nodecoords_list_int[i], nodecoords_list_int[i+1], nodecoords_list_int[i+2]]
+            nodecoords_list_int_triples.append(nodecoords_list_int_triple)
+
+            nodecolors_list_int_triple = [nodecolors_list_int[i], nodecolors_list_int[i+1], nodecolors_list_int[i+2]]
+            nodecolors_list_int_triples.append(nodecolors_list_int_triple)
+
+
+        color_id_max = int(max(nodecolors_list))
+        color_id_min = int(min(nodecolors_list))
+
+        out_mesh.write('<VTKFile type="UnstructuredGrid" version="1.0" byte_order="LittleEndian" header_type="UInt64">' + '\n')
+        out_mesh.write('  <UnstructuredGrid>' + '\n')
+        out_mesh.write('    <Piece NumberOfPoints="' + str(len(coords_array_lut_x)) + '" NumberOfCells="' + str(len(nodecoords_list_int_triples)) + '">' + '\n')
+        out_mesh.write('      <PointData Scalars="Scalars_">' + '\n')
+        out_mesh.write('        <DataArray type="Int64" Name="Scalars_" format="ascii" RangeMin="' +  str(min(nodecolors_list_int)) + '" RangeMax="' +  str(max(nodecolors_list_int)) + '">' + '\n')
+
+
+        out_mesh.write('          ')
+
+        #for nodecolor_id, nodecolor in enumerate(nodecolors_array):
+        #    if not numpy.isnan(nodecolor):
+        #        out_mesh.write(str(int(nodecolor)) + ' ')
+
+        for coord_lut_id, (coord_lut_x, coord_lut_y, coord_lut_z) in enumerate(zip(coords_array_lut_x, coords_array_lut_y, coords_array_lut_z)):
+            out_mesh.write(str(nodecolors_list_int[coord_lut_id]) + ' ')
+                           
+        out_mesh.write('' + '\n')
+
+        out_mesh.write('        </DataArray>' + '\n')
+        out_mesh.write('      </PointData>' + '\n')
+        out_mesh.write('      <CellData>' + '\n')
+        out_mesh.write('      </CellData>' + '\n')
+        out_mesh.write('      <Points>' + '\n')
+        out_mesh.write('        <DataArray type="Float32" Name="Points" NumberOfComponents="3" format="ascii" RangeMin="' + str(min(triangles_x_min_total, triangles_y_min_total, triangles_z_min_total)) + '" RangeMax="' + str(max(triangles_x_max_total, triangles_y_max_total, triangles_z_max_total)) + '">' + '\n')
+
+
+        out_mesh.write('          ')
+        for coord_lut_id, (coord_lut_x, coord_lut_y, coord_lut_z) in enumerate(zip(coords_array_lut_x, coords_array_lut_y, coords_array_lut_z)):
+            out_mesh.write(str(coord_lut_x) + ' ' + str(coord_lut_y) + ' ' + str(coord_lut_z) + ' ')
+
+            #if round(coord_lut_id % 2,2) != 0.00:
+            #    out_mesh.write('' + '\n')
+            #    if coord_lut_id < len(coords_array_lut_x) -1:
+            #        out_mesh.write('          ')
+
+        out_mesh.write('' + '\n')
+
+        out_mesh.write('        </DataArray>' + '\n')
+        out_mesh.write('      </Points>' + '\n')
+        out_mesh.write('      <Cells>' + '\n')
+        out_mesh.write('        <DataArray type="Int64" Name="connectivity" format="ascii" RangeMin="' +  str(int(min(nodecoords_list))) + '" RangeMax="' +  str(int(max(nodecoords_list))) + '">' + '\n')
+
+        out_mesh.write('          ')
+        for nodecoords_list_int_triple_id, nodecoords_list_int_triple in enumerate(nodecoords_list_int_triples):
+            nodecoord1, nodecoord2, nodecoord3 = nodecoords_list_int_triple
+            out_mesh.write(str(nodecoord1) + ' ' + str(nodecoord2) + ' ' + str(nodecoord3) + ' ')
+
+            #if round(nodecoords_list_int_triple_id % 2,2) != 0.00:
+            #    out_mesh.write('' + '\n')
+            #    if nodecoords_list_int_triple_id < len(nodecoords_list_int_triples) -1:
+            #        out_mesh.write('          ')
+
+        out_mesh.write('' + '\n')
+
+        out_mesh.write('        </DataArray>' + '\n')
+
+
+        out_mesh.write('        <DataArray type="Int64" Name="offsets" format="ascii" RangeMin="' + '3' + '" RangeMax="' + str(len(nodecoords_list_int_triples)*3) + '">' + '\n')
+
+        out_mesh.write('          ')
+        for nodecoords_list_int_triple_id, nodecoords_list_int_triple in enumerate(nodecoords_list_int_triples):
+            out_mesh.write(str((nodecoords_list_int_triple_id+1)*3) + ' ')
+
+            #if round((nodecoords_list_int_triple_id +1) % 6,2) == 0.00:
+            #    out_mesh.write('' + '\n')
+            #    if nodecoords_list_int_triple_id < len(nodecoords_list_int_triples) -1:
+            #        out_mesh.write('          ')
+
+        out_mesh.write('' + '\n')
+
+        out_mesh.write('        </DataArray>' + '\n')
+        out_mesh.write('        <DataArray type="UInt8" Name="types" format="ascii" RangeMin="5" RangeMax="5">' + '\n')
+        
+
+        out_mesh.write('          ')
+        for nodecoords_list_int_triple_id, nodecoords_list_int_triple in enumerate(nodecoords_list_int_triples):
+            out_mesh.write('5' + ' ')
+
+            #if round((nodecoords_list_int_triple_id +1) % 6,2) == 0.00:
+            #    out_mesh.write('' + '\n')
+            #    if nodecoords_list_int_triple_id < len(nodecoords_list_int_triples) -1:
+            #        out_mesh.write('          ')
+
+        out_mesh.write('' + '\n')
+               
+        out_mesh.write('        </DataArray>' + '\n')
+        out_mesh.write('      </Cells>' + '\n')
+        out_mesh.write('    </Piece>' + '\n')
+        out_mesh.write('  </UnstructuredGrid>' + '\n')
+        out_mesh.write('</VTKFile>' + '\n')
+
+
+        import os
+        print()
+        out_ctable = open(os.path.splitext(out_mesh_filename)[0] + '_ctable.json', 'w')
+
+
+        """
+        out_ctable.write('[' + '\n')
+        out_ctable.write('   {' + '\n')
+        out_ctable.write('      "IndexedColors" : [' + '\n')
+
+        for i in range(0, color_id_max):
+            if i < color_id_max-1:
+                line_ending = ','
+            else:
+                line_ending = ''
+            out_ctable.write('         ' + str(colors_array_lut_red[i]) + ',' + str(colors_array_lut_green[i]) + ',' + str(colors_array_lut_blue[i]) + line_ending  + '\n')
+
+        out_ctable.write('      ],' + '\n')
+        out_ctable.write('      "Name" : "geoTriMesh",' + '\n')
+        out_ctable.write('      "NanColor" : [ 0.97647058823529409, 0.51372549019607838, 0.14117647058823529 ]' + '\n')
+        out_ctable.write('   }' + '\n')
+        out_ctable.write(']' + '\n')
+        """
+
+
+        #"""
+        out_ctable.write('[' + '\n')
+        out_ctable.write('   {' + '\n')
+        out_ctable.write('      "ColorSpace" : "Diverging",' + '\n')
+        out_ctable.write('      "Name" : "ctable",' + '\n')
+        out_ctable.write('      "NanColor" : [ 1, 1, 0 ],' + '\n')
+        out_ctable.write('      "RGBPoints" : [' + '\n')
+
+
+        separation_char = ','
+        out_ctable.write('         ')
+        print('colors', len(colors_array_lut_red))
+
+        for i in range(0, len(colors_array_lut_red)):
+
+            test = int(nodecolors_array[i])
+            print(test)
+
+            if i == len(colors_array_lut_red)-1:
+                separation_char = ''
+
+            out_ctable.write(str(int(i)) + ',' + str(colors_array_lut_red[test]) + ',' + str(colors_array_lut_green[test]) + ',' + str(colors_array_lut_blue[test]) + separation_char)
+
+        out_ctable.write('' + '\n')
+
+        out_ctable.write('      ]' + '\n')
+        out_ctable.write('   }' + '\n')
+        out_ctable.write(']' + '\n')
+
+        out_ctable.close()
+        #"""
+
+
+
     def write_python_matplotlib(self, nodecoords_array, coords_arrays_lut, nodecolors_array, colors_arrays_lut, out_mesh, out_mesh_filename, aoi3d, center_scale_coords, indexed_colors, scale_xy, z_exaggeration, projection, centering, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_boundaries_total):
-        import random
 
         logger.info('writing maplotlib python file')
 

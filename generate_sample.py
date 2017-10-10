@@ -37,7 +37,7 @@ elevation = mesh.ElevationMesh()
 
 ## VTK
 elevation.generate_mesh( dem=srtm3, orthophoto=bluemarble, boundaries=osm, 
-					     mesh_prefix='pottenstein', mesh_format='vtu', centering = False, projection='orig')
+					     mesh_prefix='pottenstein', mesh_format='vtu', centering = True, projection='orig')
 
 ## X3D
 #elevation.generate_mesh( dem=srtm3, orthophoto=bluemarble, boundaries=osm, 

@@ -45,7 +45,9 @@ class ElevationMesh(object):
         pass
 
 
-    def generate_mesh(self, dem=None, orthophoto=None, boundaries=None, dem_nodata=None, orthophoto_nodata=None, tiles_size=None, tiles_bbox=None, mesh_prefix='out', mesh_path=os.path.join(os.getcwd(),'out'), mesh_shapefile=False, scale_xy=0.000001, z_exaggeration=1.0, projection='orig', centering=True, indexed_colors=True, coloring_mode='orthophoto', mesh_format='x3d'):
+    def generate_mesh(self, dem=None, orthophoto=None, boundaries=None, dem_nodata=None, orthophoto_nodata=None, tiles_size=None, tiles_bbox=None, mesh_prefix='out', 
+                        mesh_path=os.path.join(os.getcwd(),'out'), mesh_shapefile=False, scale_xy=None, z_exaggeration=1.0, projection='orig', centering=True, indexed_colors=False, 
+                        coloring_mode='orthophoto', mesh_format='x3d', orthophoto_bitdepth=8):
         
         if dem==None:
             logger.info('A DEM is required. Exiting.')
@@ -340,7 +342,7 @@ class ElevationMesh(object):
     
     
                         if in_geometry != None and str(in_geometry).upper() != 'GEOMETRYCOLLECTION EMPTY':
-                            out_triangles_minmax_geom_total = self.ogr_to_elevation_mesh(in_dem, in_orthophoto, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_orthophoto_nodata_ext, out_triangles_layer, indexed_colors, coloring_mode, in_dem_stats_minmax, in_orthophoto_stats_minmax, mesh_format, out_log_filename)
+                            out_triangles_minmax_geom_total = self.ogr_to_elevation_mesh(in_dem, in_orthophoto, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_orthophoto_nodata_ext, out_triangles_layer, indexed_colors, coloring_mode, in_dem_stats_minmax, in_orthophoto_stats_minmax, mesh_format, out_log_filename, orthophoto_bitdepth)
                             
     
                             out_triangles_x_min_geom_total, out_triangles_x_max_geom_total, out_triangles_y_min_geom_total, out_triangles_y_max_geom_total, out_triangles_z_min_geom_total, out_triangles_z_max_geom_total = out_triangles_minmax_geom_total
@@ -385,7 +387,7 @@ class ElevationMesh(object):
 
 
     def parse_polygon(self, in_in_boundary_polygon, in_dem, in_orthophoto, out_triangles_layer, out_triangles_layer_feature_defn, in_dem_nodata_ext, in_orthophoto_nodata_ext, in_dem_res_x, in_dem_res_y, in_dem_extent_x_min, in_dem_extent_x_max, in_dem_extent_y_min, in_dem_extent_y_max, in_dem_cols, in_dem_rows,
-            in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, in_orthophoto_stats_minmax, mesh_format, out_log_filename):
+            in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, in_orthophoto_stats_minmax, mesh_format, out_log_filename, orthophoto_bitdepth):
 
         logger.info('parsing polygon')
 
@@ -855,39 +857,29 @@ class ElevationMesh(object):
                                                             red_c, green_c, blue_c = 255,255,255
         
 
-                                                        """
-                                                        orthophoto_is_16bit = True
 
-                                                        if orthophoto_is_16bit == True:
+                                                        if orthophoto_bitdepth > 8:
 
-                                                            red_a = (red_a * 100.0 / 65536.0) * 2.55
-                                                            green_a = (green_a * 100.0 / 65536.0) * 2.55
-                                                            blue_a = (blue_a * 100.0 / 65536.0) * 2.55
-                                                            
-                                                            red_b = (red_b * 100.0 / 65536.0) * 2.55
-                                                            green_b = (green_b * 100.0 / 65536.0) * 2.55
-                                                            blue_b = (blue_b * 100.0 / 65536.0) * 2.55
-                                                            
-                                                            red_c = (red_c * 100.0 / 65536.0) * 2.55
-                                                            green_c = (green_c * 100.0 / 65536.0) * 2.55
-                                                            blue_c = (blue_c * 100.0 / 65536.0) * 2.55
-                                                        """
-
-                                                        
-                                                        ## spread color table
-                                                        red_a = ((red_a - red_min) * 100 / (red_max - red_min)) * 2.55
-                                                        blue_a = ((blue_a - blue_min) * 100 / (blue_max - blue_min)) * 2.55
-                                                        green_a = ((green_a - green_min) * 100 / (green_max - green_min)) * 2.55
-                                                        red_b = ((red_b - red_min) * 100 / (red_max - red_min)) * 2.55
-                                                        blue_b = ((blue_b - blue_min) * 100 / (blue_max - blue_min)) * 2.55
-                                                        green_b = ((green_b - green_min) * 100 / (green_max - green_min)) * 2.55
-                                                        red_c = ((red_c - red_min) * 100 / (red_max - red_min)) * 2.55
-                                                        blue_c = ((blue_c - blue_min) * 100 / (blue_max - blue_min)) * 2.55
-                                                        green_c = ((green_c - green_min) * 100 / (green_max - green_min)) * 2.55
+                                                            orthophoto_bitdepth_corr = 2.0
+                                                            #print('16 BIT')
+            
+                                                            #"""
+                                                            ## spread color table
+                                                            red_a = ((red_a - red_min) * 100 / (red_max - red_min)) * 2.55 
+                                                            blue_a = ((blue_a - blue_min) * 100 / (blue_max - blue_min)) * 2.55
+                                                            green_a = ((green_a - green_min) * 100 / (green_max - green_min)) * 2.55
+                                                            red_b = ((red_b - red_min) * 100 / (red_max - red_min)) * 2.55
+                                                            blue_b = ((blue_b - blue_min) * 100 / (blue_max - blue_min)) * 2.55
+                                                            green_b = ((green_b - green_min) * 100 / (green_max - green_min)) * 2.55
+                                                            red_c = ((red_c - red_min) * 100 / (red_max - red_min)) * 2.55
+                                                            blue_c = ((blue_c - blue_min) * 100 / (blue_max - blue_min)) * 2.55
+                                                            green_c = ((green_c - green_min) * 100 / (green_max - green_min)) * 2.55
+                                                            #"""
 
 
-                                                        #red_a_perc = round((red_a * 100.0 / 255.0) / 100.0,2)
+                                                            #red_a_perc = round((red_a * 100.0 / 255.0) / 100.0,2)
         
+
                                                         out_triangles_feature.SetField("A_RED", (red_a * 100.0 / 255.0) / 100.0)
                                                         out_triangles_feature.SetField("A_GREEN", (green_a * 100.0 / 255.0) / 100.0)
                                                         out_triangles_feature.SetField("A_BLUE", (blue_a * 100.0 / 255.0) / 100.0)
@@ -984,7 +976,8 @@ class ElevationMesh(object):
     
 
 
-    def ogr_to_elevation_mesh(self, in_dem, in_orthophoto, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, out_triangles_layer, indexed_colors, coloring_mode, in_dem_stats_minmax, in_orthophoto_stats_minmax, mesh_format, out_log_filename):
+    def ogr_to_elevation_mesh(self, in_dem, in_orthophoto, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, out_triangles_layer, 
+                                indexed_colors, coloring_mode, in_dem_stats_minmax, in_orthophoto_stats_minmax, mesh_format, out_log_filename, orthophoto_bitdepth):
 
         logger.info('ogr to elevation mesh')
         
@@ -1053,7 +1046,7 @@ class ElevationMesh(object):
 
         if in_geometry_geom_type.upper() == "POLYGON":
             out_triangles_layer, out_triangles_minmax_poly_total = self.parse_polygon(in_geometry, in_dem, in_orthophoto, out_triangles_layer, out_triangles_layer_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, in_dem_res_x, in_dem_res_y, in_dem_extent_x_min, in_dem_extent_x_max, in_dem_extent_y_min, in_dem_extent_y_max, in_dem_cols, in_dem_rows,
-                    in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, in_orthophoto_stats_minmax, mesh_format, out_log_filename)
+                    in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, in_orthophoto_stats_minmax, mesh_format, out_log_filename, orthophoto_bitdepth)
 
 
             out_triangles_x_min_poly_total, out_triangles_x_max_poly_total, out_triangles_y_min_poly_total, out_triangles_y_max_poly_total, out_triangles_z_min_poly_total, out_triangles_z_max_poly_total = out_triangles_minmax_poly_total
@@ -1074,7 +1067,7 @@ class ElevationMesh(object):
                 if in_geometry_polygon_id > -1:
 
                     out_triangles_layer, out_triangles_minmax_poly_total = self.parse_polygon(in_geometry_polygon, in_dem, in_orthophoto, out_triangles_layer, out_triangles_layer_feature_defn, in_dem_nodata_ext, in_otho_nodata_ext, in_dem_res_x, in_dem_res_y, in_dem_extent_x_min, in_dem_extent_x_max, in_dem_extent_y_min, in_dem_extent_y_max, in_dem_cols, in_dem_rows,
-                            in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, in_orthophoto_stats_minmax, mesh_format, out_log_filename)
+                            in_orthophoto_extent_x_min, in_orthophoto_extent_x_max, in_orthophoto_extent_y_min, in_orthophoto_extent_y_max, in_orthophoto_res_x, in_orthophoto_res_y, in_orthophoto_cols, in_orthophoto_rows, coloring_mode, in_dem_stats_minmax, in_orthophoto_stats_minmax, mesh_format, out_log_filename, orthophoto_bitdepth)
 
 
                     out_triangles_x_min_poly_total, out_triangles_x_max_poly_total, out_triangles_y_min_poly_total, out_triangles_y_max_poly_total, out_triangles_z_min_poly_total, out_triangles_z_max_poly_total = out_triangles_minmax_poly_total
@@ -1226,12 +1219,12 @@ class ElevationMesh(object):
                                                     ( coords_array_y[:] == round(coord_y,16) ) &
                                                     ( coords_array_z[:] == round(coord_z,16) ) )
             
-                    for coord_location in coord_locations:
-                        coords_array_x[coord_location] = numpy.nan
-                        coords_array_y[coord_location] = numpy.nan
-                        coords_array_z[coord_location] = numpy.nan
+                    #for coord_location in coord_locations:
+                    coords_array_x[coord_locations] = numpy.nan
+                    coords_array_y[coord_locations] = numpy.nan
+                    coords_array_z[coord_locations] = numpy.nan
             
-                        nodecoords_array[coord_location] = unique_nodecoords_cnt
+                    nodecoords_array[coord_locations] = unique_nodecoords_cnt
             
                     coords_array_lut_x[unique_nodecoords_cnt] = coord_x
                     coords_array_lut_y[unique_nodecoords_cnt] = coord_y
@@ -1443,47 +1436,71 @@ class ElevationMesh(object):
                     y_out = y_out_orig * scale_xy
                     z_out = z_out_orig * scale_z
 
+
                 else:
+                    
+                    ## Target projection is same as original file (might be projected or unprojected)
 
 
+                    #Length in meters of 1 deg of latitude = always 111.32 km
+                    #Length in meters of 1 deg of longitude = 40075 km * cos( latitude ) / 360
+                        
+                    #in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax
+                    in_boundaries_x_min, in_boundaries_x_max, in_boundaries_y_min, in_boundaries_y_max = in_boundaries_extent
+                    #in_dem_stats_min, in_dem_stats_max = in_dem_stats_minmax
+
+                    in_boundaries_centroid_x, in_boundaries_centroid_y = in_boundaries_centroid
+
+
+                    in_boundaries_x_diff = in_boundaries_x_max - in_boundaries_x_min
+                    in_boundaries_y_diff = in_boundaries_y_max - in_boundaries_y_min
+                        
+
+
+                    ## If no scale is given, use scale optimized for Blender
+
+                    if scale_xy == None:
+
+                        scale_x = 16.0 / in_boundaries_x_diff
+                        scale_y = 16.0 / in_boundaries_y_diff
+
+                    else:
+                        scale_x = scale_xy
+                        scale_y = scale_xy
+
+
+                    if scale_x <= scale_y:
+                        scale_xy = scale_x
+                    else:
+                        scale_xy = scale_y
+
+
+
+                    ## Determine Z-Scale, depending on the existence of a projection
+
+                    if str(in_boundaries_spatialref_projcs).lower() == 'none':
+                        # 111320.0: 1 degree on the equator in meters
+                        scale_z = scale_xy / 111320.0
+                    else:
+                        scale_z = scale_xy
+
+
+
+
+
+                    ## If 'centering' is set to true, move center output to the origin of the coordinate axes (x,y,z)
 
                     if centering == True:
                         
                         #spatialRef = osr.SpatialReference()
                         #spatialRef.ImportFromEPSG(2927)         # from EPSG
                         
-
-                        
-                        
-                        #Length in meters of 1 deg of latitude = always 111.32 km
-                        #Length in meters of 1 deg of longitude = 40075 km * cos( latitude ) / 360
-                        
-                        #in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax
-                        in_boundaries_x_min, in_boundaries_x_max, in_boundaries_y_min, in_boundaries_y_max = in_boundaries_extent
-                        #in_dem_stats_min, in_dem_stats_max = in_dem_stats_minmax
-
-                        in_boundaries_centroid_x, in_boundaries_centroid_y = in_boundaries_centroid
-
-
-                        in_boundaries_x_diff = in_boundaries_x_max - in_boundaries_x_min
-                        in_boundaries_y_diff = in_boundaries_y_max - in_boundaries_y_min
+                       
                         
 
-                        scale_x = 16.0 / in_boundaries_x_diff
-                        scale_y = 16.0 / in_boundaries_y_diff
                         
-                        if scale_x <= scale_y:
-                            scale_xy = scale_x
-                        else:
-                            scale_xy = scale_y
 
                         #scale_z = scale_xy
-
-                        if str(in_boundaries_spatialref_projcs).lower() == 'none':
-                            # 111320.0: 1 degree on the equator in meters
-                            scale_z = scale_xy / 111320.0
-                        else:
-                            scale_z = scale_xy
 
 
 
@@ -1534,6 +1551,9 @@ class ElevationMesh(object):
 
     def write_vtu(self, nodecoords_array, coords_arrays_lut, nodecolors_array, colors_arrays_lut, out_mesh, out_mesh_filename, aoi3d, center_scale_coords, indexed_colors, scale_xy, z_exaggeration, projection, centering, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_boundaries_total):
 
+        ## in Paraview: Deactivate 'Map Scalars' !!
+
+
         #print(nodecoords_array[:5])
         #sys.exit()
 
@@ -1546,96 +1566,101 @@ class ElevationMesh(object):
         triangles_x_min_total, triangles_x_max_total, triangles_y_min_total, triangles_y_max_total, triangles_z_min_total, triangles_z_max_total = aoi3d
         
         nodecoords_list = nodecoords_array.tolist()
-        nodecolors_list = nodecolors_array.tolist()
 
         nodecoords_list_int = map(int, nodecoords_list)
         nodecoords_list_int_max = max(nodecoords_list_int)
-        nodecolors_list_int = map(int, nodecolors_list)
-        nodecolors_list_int_max = max(nodecolors_list_int)
+
         
-        print('coords', len(nodecoords_list_int), nodecoords_list_int_max)
-        print('colors', len(nodecolors_list_int), nodecolors_list_int_max)
+        #print('coords', len(nodecoords_list_int), nodecoords_list_int_max)
+
+
         #sys.exit()
         
 
         nodecoords_list_int_triples = []
-        nodecolors_list_int_triples = []
 
-        
-        if len(nodecolors_list) > 0:
+        a=1
+        if a==1:
     
             for i in range(0, len(nodecoords_list_int), 3):
                 nodecoords_list_int_triple = [nodecoords_list_int[i], nodecoords_list_int[i+1], nodecoords_list_int[i+2]]
                 nodecoords_list_int_triples.append(nodecoords_list_int_triple)
-    
-                nodecolors_list_int_triple = [nodecolors_list_int[i], nodecolors_list_int[i+1], nodecolors_list_int[i+2]]
-                nodecolors_list_int_triples.append(nodecolors_list_int_triple)
-    
-    
-            color_id_max = int(max(nodecolors_list))
-            color_id_min = int(min(nodecolors_list))
+       
     
             out_mesh.write('<VTKFile type="UnstructuredGrid" version="1.0" byte_order="LittleEndian" header_type="UInt64">' + '\n')
             out_mesh.write('  <UnstructuredGrid>' + '\n')
             out_mesh.write('    <Piece NumberOfPoints="' + str(len(coords_array_lut_x)) + '" NumberOfCells="' + str(len(nodecoords_list_int_triples)) + '">' + '\n')
 
-            out_mesh.write('      <PointData Scalars="ScalarsPoints_">' + '\n')
-            out_mesh.write('        <DataArray type="Int64" Name="ScalarsPoints_" format="ascii" NumberOfComponents="1" RangeMin="' +  str(min(nodecolors_list_int)) + '" RangeMax="' +  str(max(nodecolors_list_int)) + '">' + '\n')
-      
-            out_mesh.write('          ')
 
-            for coord_id in range(0,nodecoords_list_int_max+1):
+            if indexed_colors == True:
 
-                for coord_id_orig in range(0,len(nodecoords_list_int)+1):
-                    if nodecoords_list_int[coord_id_orig] == coord_id:
+                nodecolors_list = nodecolors_array.tolist()
+                nodecolors_list_int = map(int, nodecolors_list)
+                nodecolors_list_int_max = max(nodecolors_list_int)
+                print('colors', len(nodecolors_list_int), nodecolors_list_int_max)
+                nodecolors_list_int_triples = []
+
+
+                for i in range(0, len(nodecoords_list_int), 3):   
+                    nodecolors_list_int_triple = [nodecolors_list_int[i], nodecolors_list_int[i+1], nodecolors_list_int[i+2]]
+                    nodecolors_list_int_triples.append(nodecolors_list_int_triple)
+
+                color_id_max = int(max(nodecolors_list))
+                color_id_min = int(min(nodecolors_list))
+   
+
+
+
+
+                out_mesh.write('      <PointData Scalars="ScalarsPoints_">' + '\n')
+                out_mesh.write('        <DataArray type="Int64" Name="ScalarsPoints_" format="ascii" NumberOfComponents="1" RangeMin="' +  str(min(nodecolors_list_int)) + '" RangeMax="' +  str(max(nodecolors_list_int)) + '">' + '\n')
+                out_mesh.write('          ')
+
+                for coord_id in range(0,nodecoords_list_int_max+1):
+
+                    for coord_id_orig in range(0,len(nodecoords_list_int)+1):
+                        if nodecoords_list_int[coord_id_orig] == coord_id:
                         
-                        node0_index = nodecolors_list_int[coord_id_orig]
+                            node0_index = nodecolors_list_int[coord_id_orig]
 
-                        out_mesh.write(str(node0_index) + ' ')
-                        break
+                            out_mesh.write(str(node0_index) + ' ')
+                            break
 
                                 
-            out_mesh.write('' + '\n')
-    
-            out_mesh.write('        </DataArray>' + '\n')
+                out_mesh.write('' + '\n')   
+                out_mesh.write('        </DataArray>' + '\n')
+                out_mesh.write('      </PointData>' + '\n')
 
-            out_mesh.write('      </PointData>' + '\n')
 
-            #Write Cell Color Data
-            """
-            out_mesh.write('      <CellData Scalars="ScalarsCells_">' + '\n')
+            else:
 
-            out_mesh.write('        <DataArray type="Int64" Name="ScalarsCells_" format="ascii" NumberOfComponents="3" RangeMin="' +  str(min(nodecolors_list_int)) + '" RangeMax="' +  str(max(nodecolors_list_int)) + '">' + '\n')
-      
-            out_mesh.write('          ')
-  
-            for nodecolor_id, nodecolor in enumerate(range(0,len(nodecoords_list_int_triples))):
+                out_mesh.write('      <PointData Scalars="Colors">' + '\n')
+                out_mesh.write('        <DataArray type="UInt8" Name="Colors" format="ascii" RangeMin="0" RangeMax="255" NumberOfComponents="3">' + '\n')
+                out_mesh.write('          ')
 
-                node0_index = nodecolors_list_int_triples[nodecolor_id][0]
-                node1_index = nodecolors_list_int_triples[nodecolor_id][1]
-                node2_index = nodecolors_list_int_triples[nodecolor_id][2]
+                print('colors:', len(colors_array_lut_red))
+                for color_lut_id, (color_lut_red, color_lut_green, color_lut_blue, color_lut_alpha) in enumerate(zip(colors_array_lut_red, colors_array_lut_green, colors_array_lut_blue, colors_array_lut_alpha)):
 
-                out_mesh.write(str(node0_index) + ' ' + str(node1_index) + ' ' + str(node2_index) + ' ')
-                                
-            out_mesh.write('' + '\n')
-    
-            out_mesh.write('        </DataArray>' + '\n')
+                    out_mesh.write(str(int(color_lut_red * 100 * 2.55)) + ' ' + str(int(color_lut_green * 100 * 2.55)) + ' ' + str(int(color_lut_blue * 100 * 2.55)) + ' ' )
+                    #out_mesh.write(str(color_lut_red) + ' ' + str(color_lut_green) + ' ' + str(color_lut_blue) + ' ' )
 
-            out_mesh.write('      </CellData>' + '\n')
-            """
+
+                out_mesh.write('' + '\n')
+                out_mesh.write('        </DataArray>' + '\n')
+                out_mesh.write('      </PointData>' + '\n')
+
 
             out_mesh.write('      <Points>' + '\n')
             out_mesh.write('        <DataArray type="Float32" Name="Points" NumberOfComponents="3" format="ascii" RangeMin="' + str(min(triangles_x_min_total, triangles_y_min_total, triangles_z_min_total)) + '" RangeMax="' + str(max(triangles_x_max_total, triangles_y_max_total, triangles_z_max_total)) + '">' + '\n')
     
     
             out_mesh.write('          ')
+
+            print('points:', len(coords_array_lut_x))
             for coord_lut_id, (coord_lut_x, coord_lut_y, coord_lut_z) in enumerate(zip(coords_array_lut_x, coords_array_lut_y, coords_array_lut_z)):
+                #out_mesh.write('1' + ' ' )
                 out_mesh.write(str(coord_lut_x) + ' ' + str(coord_lut_y) + ' ' + str(coord_lut_z) + ' ')
     
-                #if round(coord_lut_id % 2,2) != 0.00:
-                #    out_mesh.write('' + '\n')
-                #    if coord_lut_id < len(coords_array_lut_x) -1:
-                #        out_mesh.write('          ')
     
             out_mesh.write('' + '\n')
     
@@ -1685,6 +1710,8 @@ class ElevationMesh(object):
                 #    out_mesh.write('' + '\n')
                 #    if nodecoords_list_int_triple_id < len(nodecoords_list_int_triples) -1:
                 #        out_mesh.write('          ')
+
+
     
             out_mesh.write('' + '\n')
                    
@@ -1695,44 +1722,258 @@ class ElevationMesh(object):
             out_mesh.write('</VTKFile>' + '\n')
     
     
-            out_ctable = open(os.path.splitext(out_mesh_filename)[0] + '_ctable.json', 'w')
-            out_ctable_filename = os.path.splitext(os.path.basename(out_mesh_filename))[0]
+            if indexed_colors == True:
+    
+                out_ctable = open(os.path.splitext(out_mesh_filename)[0] + '_ctable.json', 'w')
+                out_ctable_filename = os.path.splitext(os.path.basename(out_mesh_filename))[0]  
+    
+                out_ctable.write('[' + '\n')
+                out_ctable.write('   {' + '\n')
+                out_ctable.write('      "ColorSpace" : "Diverging",' + '\n')
+                out_ctable.write('      "Name" : "' + out_ctable_filename + '",' + '\n')
+                out_ctable.write('      "NanColor" : [ 1, 1, 0 ],' + '\n')
+                out_ctable.write('      "RGBPoints" : [' + '\n')
+    
 
-    
-    
-            out_ctable.write('[' + '\n')
-            out_ctable.write('   {' + '\n')
-            out_ctable.write('      "ColorSpace" : "Diverging",' + '\n')
-            out_ctable.write('      "Name" : "' + out_ctable_filename + '",' + '\n')
-            out_ctable.write('      "NanColor" : [ 1, 1, 0 ],' + '\n')
-            out_ctable.write('      "RGBPoints" : [' + '\n')
-    
-    
-            separation_char = ','
-            print('colors', len(colors_array_lut_red))
+                separation_char = ','
+                print('colors', len(colors_array_lut_red))
 
 
-            for nodecolor_id, nodecolor in enumerate(range(0,len(colors_array_lut_red))):
+                for nodecolor_id, nodecolor in enumerate(range(0,len(colors_array_lut_red))):
 
    
-                if nodecolor_id == len(colors_array_lut_red)-1:
-                    separation_char = ''
+                    if nodecolor_id == len(colors_array_lut_red)-1:
+                        separation_char = ''
     
-                #out_ctable.write(str(int(i)) + ',' + str(colors_array_lut_red[test]) + ',' + str(colors_array_lut_green[test]) + ',' + str(colors_array_lut_blue[test]) + separation_char)
-                out_ctable.write('         ' + str(int(nodecolor_id)) + ',' + str(colors_array_lut_red[nodecolor_id]) + ',' + str(colors_array_lut_green[nodecolor_id]) + ',' + str(colors_array_lut_blue[nodecolor_id]) + separation_char + '\n')
+                    #out_ctable.write(str(int(i)) + ',' + str(colors_array_lut_red[test]) + ',' + str(colors_array_lut_green[test]) + ',' + str(colors_array_lut_blue[test]) + separation_char)
+                    out_ctable.write('         ' + str(int(nodecolor_id)) + ',' + str(colors_array_lut_red[nodecolor_id]) + ',' + str(colors_array_lut_green[nodecolor_id]) + ',' + str(colors_array_lut_blue[nodecolor_id]) + separation_char + '\n')
     
-            out_ctable.write('' + '\n')
+                out_ctable.write('' + '\n')
     
-            out_ctable.write('      ]' + '\n')
-            out_ctable.write('   }' + '\n')
-            out_ctable.write(']' + '\n')
+                out_ctable.write('      ]' + '\n')
+                out_ctable.write('   }' + '\n')
+                out_ctable.write(']' + '\n')
     
-            out_ctable.close()
-            #"""
+                out_ctable.close()
+                #"""
+
     
+
+
 
 
     def write_python_matplotlib(self, nodecoords_array, coords_arrays_lut, nodecolors_array, colors_arrays_lut, out_mesh, out_mesh_filename, aoi3d, center_scale_coords, indexed_colors, scale_xy, z_exaggeration, projection, centering, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_boundaries_total):
+
+        logger.info('writing maplotlib python file')
+
+        coords_array_lut_x, coords_array_lut_y, coords_array_lut_z = coords_arrays_lut
+        colors_array_lut_red, colors_array_lut_green, colors_array_lut_blue, colors_array_lut_alpha = colors_arrays_lut
+
+
+        coords_list=[]
+        for coord_id, (coord_x, coord_y, coord_z) in enumerate(zip(coords_array_lut_x, coords_array_lut_y, coords_array_lut_z)):
+            coords_list.append((coord_x, coord_y, coord_z))
+
+        colors_list=[]
+        for color_id, (color_red, color_green, color_blue, color_alpha) in enumerate(zip(colors_array_lut_red, colors_array_lut_green, colors_array_lut_blue, colors_array_lut_alpha)):
+            colors_list.append(( int(round(color_red*255,0)), int(round(color_green*255,0)), int(round(color_blue*255,0)), int(round(color_alpha*255,0)) ))
+
+
+
+        nodecoords_list = nodecoords_array.tolist()
+        nodecoords_list_int = map(int, nodecoords_list)
+
+        nodecoords_list_int_triples = []      
+
+        for nodecoord_id in range(0, len(nodecoords_list_int), 3):
+            nodecoord_triple = (nodecoords_list_int[nodecoord_id], nodecoords_list_int[nodecoord_id+1], nodecoords_list_int[nodecoord_id+2])
+            nodecoords_list_int_triples.append(nodecoord_triple)
+
+
+        coords_array_lut_x_min = min(coords_array_lut_x)
+        coords_array_lut_x_max = max(coords_array_lut_x)
+        coords_array_lut_y_min = min(coords_array_lut_y)
+        coords_array_lut_y_max = max(coords_array_lut_y)
+        coords_array_lut_z_min = min(coords_array_lut_z)
+        coords_array_lut_z_max = max(coords_array_lut_z)
+
+        coords_array_lut_x_mean = (coords_array_lut_x_min + coords_array_lut_x_max) / 2.0
+        coords_array_lut_y_mean = (coords_array_lut_y_min + coords_array_lut_y_max) / 2.0
+        coords_array_lut_z_mean = (coords_array_lut_z_min + coords_array_lut_z_max) / 2.0
+
+
+        coords_array_lut_x_dist = coords_array_lut_x_max - coords_array_lut_x_min
+        coords_array_lut_y_dist = coords_array_lut_y_max - coords_array_lut_y_min
+        coords_array_lut_z_dist = coords_array_lut_z_max - coords_array_lut_z_min
+
+        coords_array_lut_xy_dist_max = max(coords_array_lut_x_dist, coords_array_lut_y_dist)
+
+        coords_array_lut_x_dist_margin = (coords_array_lut_xy_dist_max - coords_array_lut_x_dist) / 2.0
+        coords_array_lut_y_dist_margin = (coords_array_lut_xy_dist_max - coords_array_lut_y_dist) / 2.0
+        coords_array_lut_z_dist_margin = (coords_array_lut_z_dist - coords_array_lut_z_dist) / 2.0
+
+
+        coords_grid_list = [(coords_array_lut_x_min, coords_array_lut_y_min, coords_array_lut_z_min), (coords_array_lut_x_max, coords_array_lut_y_min, coords_array_lut_z_min), (coords_array_lut_x_max, coords_array_lut_y_max, coords_array_lut_z_min), (coords_array_lut_x_min, coords_array_lut_y_max, coords_array_lut_z_min)]
+        colors_grid_list = [(127, 127, 127, 255), (127, 127, 127, 255), (127, 127, 127, 255), (127, 127, 127, 255)]
+        nodecoords_grid_list_int_triples = [(0, 1, 2, 3)]
+       
+        out_mesh.write('import numpy as np' + '\n')
+        out_mesh.write('import vtk' + '\n')
+
+        out_mesh.write('' + '\n')
+
+        out_mesh.write('coords_list = ' + str(coords_list) + '\n')
+        out_mesh.write('colors_list = ' + str(colors_list) + '\n')
+        out_mesh.write('triangles_list = ' + str(nodecoords_list_int_triples) + '\n')
+        out_mesh.write('' + '\n')
+        out_mesh.write('coords_grid_list = ' + str(coords_grid_list) + '\n')
+        out_mesh.write('colors_grid_list = ' + str(colors_grid_list) + '\n')
+        out_mesh.write('quads_grid_list = ' + str(nodecoords_grid_list_int_triples) + '\n')
+        out_mesh.write('' + '\n')
+
+        out_mesh.write('points = vtk.vtkPoints()' + '\n')
+        out_mesh.write('colors = vtk.vtkUnsignedCharArray()' + '\n')
+        out_mesh.write('colors.SetNumberOfComponents(3)' + '\n')
+
+        out_mesh.write('points_grid = vtk.vtkPoints()' + '\n')
+        out_mesh.write('colors_grid = vtk.vtkUnsignedCharArray()' + '\n')
+        out_mesh.write('colors_grid.SetNumberOfComponents(3)' + '\n')
+
+        out_mesh.write('for coord_id, (coord, color) in enumerate(zip(coords_list, colors_list)):' + '\n')
+        out_mesh.write('    points.InsertNextPoint(coord[0], coord[1], coord[2])' + '\n')
+        out_mesh.write('    colors.InsertNextTuple3(color[0], color[1], color[2])' + '\n')
+        out_mesh.write('' + '\n')
+
+        out_mesh.write('' + '\n')
+
+        out_mesh.write('for coord_grid_id, (coord_grid, color_grid) in enumerate(zip(coords_grid_list, colors_grid_list)):' + '\n')
+        out_mesh.write('    points_grid.InsertNextPoint(coord_grid[0], coord_grid[1], coord_grid[2])' + '\n')
+        out_mesh.write('    colors.InsertNextTuple3(color_grid[0], color_grid[1], color_grid[2])' + '\n')
+        out_mesh.write('' + '\n')
+
+
+
+
+        out_mesh.write('triangles = vtk.vtkCellArray()' + '\n')
+
+        out_mesh.write('quads_grid = vtk.vtkCellArray()' + '\n')
+
+        out_mesh.write('' + '\n')
+        out_mesh.write('for tri in triangles_list:' + '\n')
+        out_mesh.write('' + '\n')
+        out_mesh.write('    triangle = vtk.vtkTriangle()' + '\n')
+        out_mesh.write('    triangle.GetPointIds().SetId(0, tri[0])' + '\n')
+        out_mesh.write('    triangle.GetPointIds().SetId(1, tri[1])' + '\n')
+        out_mesh.write('    triangle.GetPointIds().SetId(2, tri[2])' + '\n')
+        out_mesh.write('' + '\n')
+        out_mesh.write('    triangles.InsertNextCell(triangle)' + '\n')
+        out_mesh.write('' + '\n')
+
+
+        out_mesh.write('for quad_grid in quads_grid_list:' + '\n')
+        out_mesh.write('' + '\n')
+        out_mesh.write('    quad = vtk.vtkQuad()' + '\n')
+        out_mesh.write('    quad.GetPointIds().SetId(0, quad_grid[0])' + '\n')
+        out_mesh.write('    quad.GetPointIds().SetId(1, quad_grid[1])' + '\n')
+        out_mesh.write('    quad.GetPointIds().SetId(2, quad_grid[2])' + '\n')
+        out_mesh.write('    quad.GetPointIds().SetId(3, quad_grid[3])' + '\n')
+        out_mesh.write('' + '\n')
+        out_mesh.write('    quads_grid.InsertNextCell(quad)' + '\n')
+        out_mesh.write('' + '\n')
+
+        out_mesh.write('# polydata object' + '\n')
+        out_mesh.write('trianglePolyData = vtk.vtkPolyData()' + '\n')
+        out_mesh.write('trianglePolyData.SetPoints(points)' + '\n')
+        out_mesh.write('trianglePolyData.SetPolys(triangles)' + '\n')
+        out_mesh.write('trianglePolyData.GetPointData().SetScalars(colors)' + '\n')
+        out_mesh.write('' + '\n')
+        out_mesh.write('' + '\n')
+
+
+        out_mesh.write('# polydata object' + '\n')
+        out_mesh.write('quad_gridPolyData = vtk.vtkPolyData()' + '\n')
+        out_mesh.write('quad_gridPolyData.SetPoints(points_grid)' + '\n')
+        out_mesh.write('quad_gridPolyData.SetPolys(quads_grid)' + '\n')
+        out_mesh.write('quad_gridPolyData.GetPointData().SetScalars(colors_grid)' + '\n')
+        out_mesh.write('' + '\n')
+        out_mesh.write('' + '\n')
+
+        out_mesh.write('' + '\n')
+        out_mesh.write('# Append the two meshes' + '\n')
+        out_mesh.write('appendFilter = vtk.vtkAppendPolyData()' + '\n')
+        out_mesh.write('if vtk.VTK_MAJOR_VERSION <= 5:' + '\n')
+        out_mesh.write('    appendFilter.AddInputConnection(trianglePolyData.GetProducerPort())' + '\n')
+        out_mesh.write('    appendFilter.AddInputConnection(quad_gridPolyData.GetProducerPort())' + '\n')
+        out_mesh.write('else:' + '\n')
+        out_mesh.write('    appendFilter.AddInputData(trianglePolyData)' + '\n')
+        out_mesh.write('    appendFilter.AddInputData(quad_gridPolyData)' + '\n')
+        out_mesh.write('' + '\n')
+        out_mesh.write('appendFilter.Update()' + '\n')
+        out_mesh.write('' + '\n')
+        out_mesh.write('#  Remove any duplicate points.' + '\n')
+        out_mesh.write('cleanFilter = vtk.vtkCleanPolyData()' + '\n')
+        out_mesh.write('cleanFilter.SetInputConnection(appendFilter.GetOutputPort())' + '\n')
+        out_mesh.write('cleanFilter.Update()' + '\n')
+        
+        out_mesh.write('' + '\n')
+        out_mesh.write('' + '\n')
+
+
+        #out_mesh.write('if vtk.VTK_MAJOR_VERSION <= 5:' + '\n')
+        #out_mesh.write('    mapper.SetInput(trianglePolyData)' + '\n')
+        #out_mesh.write('else:' + '\n')
+        #out_mesh.write('    mapper.SetInputData(trianglePolyData)' + '\n')
+        #out_mesh.write('' + '\n')
+        #out_mesh.write('ren = vtk.vtkRenderer()' + '\n')
+
+        out_mesh.write('mapper = vtk.vtkPolyDataMapper()' + '\n')
+        out_mesh.write('if vtk.VTK_MAJOR_VERSION <= 5:' + '\n')
+        out_mesh.write('    mapper.SetInput(cleanFilter.GetOutput())' + '\n')
+        out_mesh.write('else:' + '\n')
+        out_mesh.write('    mapper.SetInputData(cleanFilter.GetOutput())' + '\n')
+        out_mesh.write('' + '\n')
+        out_mesh.write('ren = vtk.vtkRenderer()' + '\n')
+        out_mesh.write('ren.SetBackground(255, 255, 255)' + '\n')
+        out_mesh.write('renWin = vtk.vtkRenderWindow()' + '\n')
+        out_mesh.write('renWin.AddRenderer(ren)' + '\n')
+        out_mesh.write('' + '\n')
+        out_mesh.write('iren = vtk.vtkRenderWindowInteractor()' + '\n')
+        out_mesh.write('iren.SetRenderWindow(renWin)' + '\n')
+        out_mesh.write('' + '\n')
+        out_mesh.write('actor = vtk.vtkActor()' + '\n')
+        out_mesh.write('actor.SetMapper(mapper)' + '\n')
+        out_mesh.write('' + '\n')
+        out_mesh.write('# assign actor to the renderer' + '\n')
+        out_mesh.write('ren.AddActor(actor)' + '\n')
+        out_mesh.write('' + '\n')
+        out_mesh.write('' + '\n')
+        out_mesh.write('iren.Initialize()' + '\n')
+        out_mesh.write('#renWin.OffScreenRenderingOn()' + '\n')
+        out_mesh.write('renWin.Render()' + '\n')
+        out_mesh.write('' + '\n')
+        out_mesh.write('#exp = vtk.vtkGL2PSExporter()' + '\n')
+        out_mesh.write('#exp.SetRenderWindow(renWin)' + '\n')
+        out_mesh.write("#exp.SetFilePrefix('test')" + '\n')
+        out_mesh.write('#exp.SetFileFormat(2)' + '\n')
+        out_mesh.write('#exp.SetCompress(False)' + '\n')
+        out_mesh.write('#exp.SetLandscape(False)' + '\n')
+        out_mesh.write('#exp.SetSortToBSP()' + '\n')
+        out_mesh.write('##exp.SetSortToSimple()  # less expensive sort algorithm' + '\n')
+        out_mesh.write('#exp.DrawBackgroundOn()' + '\n')
+        out_mesh.write('#exp.SetWrite3DPropsAsRasterImage(False)' + '\n')
+        out_mesh.write('#exp.Write()' + '\n')
+        out_mesh.write('' + '\n')
+        out_mesh.write('iren.Start()' + '\n')
+
+## vector_file_formats = {'.ps': 0, '.eps': 1, '.pdf': 2, '.tex': 3}
+
+
+
+    def write_python_matplotlib_legacy(self, nodecoords_array, coords_arrays_lut, nodecolors_array, colors_arrays_lut, out_mesh, out_mesh_filename, aoi3d, center_scale_coords, indexed_colors, scale_xy, z_exaggeration, projection, centering, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_boundaries_total):
+
+        comment_mplot3d = True
+        comment_mayavi2 = False
+
 
         logger.info('writing maplotlib python file')
 
@@ -1746,11 +1987,11 @@ class ElevationMesh(object):
         coords_array_lut_y_dist = max(coords_array_lut_y) - min(coords_array_lut_y)
         coords_array_lut_z_dist = max(coords_array_lut_z) - min(coords_array_lut_z)
 
-        coords_array_lut_dist_max = max(coords_array_lut_x_dist, coords_array_lut_y_dist, coords_array_lut_z_dist)
+        coords_array_lut_dist_max = max(coords_array_lut_x_dist, coords_array_lut_y_dist)
 
         coords_array_lut_x_dist_margin = (coords_array_lut_dist_max - coords_array_lut_x_dist) / 2.0
         coords_array_lut_y_dist_margin = (coords_array_lut_dist_max - coords_array_lut_y_dist) / 2.0
-        coords_array_lut_z_dist_margin = (coords_array_lut_dist_max - coords_array_lut_z_dist) / 2.0
+        coords_array_lut_z_dist_margin = (coords_array_lut_z_dist - coords_array_lut_z_dist) / 2.0
 
 
         colors_array_lut_red, colors_array_lut_green, colors_array_lut_blue, colors_array_lut_alpha = colors_arrays_lut
@@ -1759,11 +2000,7 @@ class ElevationMesh(object):
     
         triangles_x_min_total, triangles_x_max_total, triangles_y_min_total, triangles_y_max_total, triangles_z_min_total, triangles_z_max_total = aoi3d
 
-        out_mesh.write('from mpl_toolkits.mplot3d import Axes3D' + '\n')
-        out_mesh.write('import matplotlib.pyplot as plt' + '\n')
         out_mesh.write('import numpy as np' + '\n')
-        out_mesh.write('from mpl_toolkits.mplot3d.art3d import Poly3DCollection' + '\n')
-        out_mesh.write('from matplotlib.colors import LinearSegmentedColormap' + '\n')
 
         out_mesh.write('' + '\n')
 
@@ -1772,98 +2009,175 @@ class ElevationMesh(object):
         out_mesh.write('z = np.array( ' + str(coords_array_lut_z) + ') \n')
 
         nodecoords_list = nodecoords_array.tolist()
-        nodecolors_list = nodecolors_array.tolist()
-
         nodecoords_list_int = map(int, nodecoords_list)
-        nodecolors_list_int = map(int, nodecolors_list)
-        nodecolors_list_int_max = max(nodecolors_list_int)
+        
+        out_mesh.write('' + '\n')
+
 
 
         nodecoords_list_int_triples = []
-        nodecolors_list_int_triples = []
+        cmap_list = []
+        colors_rgba = []
+        nodecoord_triple = []
+        nodecoord_triple_id = 0
+        colors_rgba_mayavi2 = []
+        scalars = []
 
-        for i in range(0, len(nodecoords_list_int), 3):
-            nodecoords_list_int_triple = [nodecoords_list_int[i], nodecoords_list_int[i+1], nodecoords_list_int[i+2]]
-            nodecoords_list_int_triples.append(nodecoords_list_int_triple)
-
-            nodecolors_list_int_triple = [nodecolors_list_int[i], nodecolors_list_int[i+1], nodecolors_list_int[i+2]]
-            nodecolors_list_int_triples.append(nodecolors_list_int_triple)
-
-            #print(nodecoords_list_int_triple)
-
-
-        #print(len(nodecoords_list_int_triples))
-        #print(len(nodecolors_list_int_triples))
-        #print(len(coords_array_lut_x_norm))
-        #print(len(nodecoords_list_int_triples))
-        #print(nodecolors_list_int_max)
-
-            
+        nodecoord_triple_cnt=0
+        colors_rgba_cnt=0
+        cmap_list_cnt=0
 
 
-        out_mesh.write('' + '\n')
+        ## Iterate through triangles
+        
+        for nodecoord_id in range(0, len(nodecoords_list_int), 3):
+
+            nodecoord_triple = [nodecoords_list_int[nodecoord_id], nodecoords_list_int[nodecoord_id+1], nodecoords_list_int[nodecoord_id+2]]
+
+            if (nodecoord_triple[0] == nodecoord_triple[1]) or (nodecoord_triple[0] == nodecoord_triple[2]) or (nodecoord_triple[0] == nodecoord_triple[2]):
+                print("warning", nodecoord_triple[0], nodecoord_triple[1], nodecoord_triple[2])
+
+            col_id = float(nodecoord_triple_cnt) / (len(nodecoords_array)/3)
+
+
+            nodecoords_list_int_triples.append(nodecoord_triple)
+            nodecoord_triple_cnt +=1
+
+
+            nodecoord_triple=[]
+            nodecoord_triple_id+=1
+
+
+            ## face coloring in mplot3d does not seem to work (at least not for larger datasets)
+            #col_id = float(nodecoord_id) / (len(nodecoords_list_int)/3)
+            #cmap_list.append(round(col_id,8))
+            #colors_rgba.append((round(col_id,8), (round(triangle_red,2), round(triangle_green,2), round(triangle_blue,2), round(triangle_alpha,2))))
+
+
+        ## Iterate through vertices
+        
+        for color_lut_id, (color_lut_red, color_lut_green, color_lut_blue, color_lut_alpha) in enumerate(zip(colors_array_lut_red, colors_array_lut_green, colors_array_lut_blue, colors_array_lut_alpha)):
+            colors_rgba_mayavi2.append([int(color_lut_red * 100 * 2.55), int(color_lut_green * 100 * 2.55), int(color_lut_blue * 100 * 2.55), 255])
+            scalars.append(color_lut_id)
+
+
 
         out_mesh.write('triangles = ' + str(nodecoords_list_int_triples) + '\n')
+        out_mesh.write('scalars = ' + str(scalars) + '\n')
+        out_mesh.write('colors = ' + str(colors_rgba_mayavi2) + '\n')
+
+
 
         out_mesh.write('' + '\n')
 
-        out_mesh.write('col_id_max = ' + str(float(nodecolors_list_int_max)) + '\n')
+        if comment_mplot3d == True:
+            mplot3d_comment_char = "#"
+        else:
+            mplot3d_comment_char = ""
+            
+        if comment_mayavi2 == True:
+            mayavi2_comment_char = "#"
+        else:
+            mayavi2_comment_char = ""
 
-        cmap_list = []
-        for j_id, j in enumerate(range(0, len(nodecoords_list_int_triples))):
-            cmap_list.append(round(j / float(len(nodecoords_list_int_triples)-1), 3))
+            
+        out_mesh.write(mplot3d_comment_char + 'from mpl_toolkits.mplot3d import Axes3D' + '\n')
+        out_mesh.write(mplot3d_comment_char + 'import matplotlib.pyplot as plt' + '\n')
+        out_mesh.write(mplot3d_comment_char + 'from mpl_toolkits.mplot3d.art3d import Poly3DCollection' + '\n')
+        out_mesh.write(mplot3d_comment_char + 'from matplotlib.colors import LinearSegmentedColormap' + '\n')
 
-        out_mesh.write('' + '\n')
+        out_mesh.write(mplot3d_comment_char + 'fig = plt.figure(figsize=(10,  10), dpi=72.0)' + '\n')
+        out_mesh.write(mplot3d_comment_char + "ax = fig.gca(projection='3d')" + '\n')
+        out_mesh.write(mplot3d_comment_char + 'ax.set_xlim([' + str(min(coords_array_lut_x) - coords_array_lut_x_dist_margin) + ',' + str(max(coords_array_lut_x) + coords_array_lut_x_dist_margin) + '])' + '\n')
+        out_mesh.write(mplot3d_comment_char + 'ax.set_ylim([' + str(min(coords_array_lut_y) - coords_array_lut_y_dist_margin) + ',' + str(max(coords_array_lut_y) + coords_array_lut_y_dist_margin) + '])' + '\n')
+        out_mesh.write(mplot3d_comment_char + 'ax.set_zlim([' + str(min(coords_array_lut_z) - coords_array_lut_z_dist_margin) + ',' + str(max(coords_array_lut_z) + coords_array_lut_z_dist_margin) + '])' + '\n')
+        out_mesh.write(mplot3d_comment_char + "ax.set_aspect('equal')" + '\n')
+        out_mesh.write(mplot3d_comment_char + 'collec = ax.plot_trisurf(x, y, z, triangles=triangles, cmap=None, linewidth=0.0, antialiased=True, shade=True)' + '\n')
+        out_mesh.write(mplot3d_comment_char + 'collec.set_array(None)' + '\n')
+        out_mesh.write(mplot3d_comment_char + 'plt.show()' + '\n')
+        out_mesh.write('\n')
 
-        out_mesh.write('colors = np.array(' + str(cmap_list) + ')' + '\n')
+        x_grid_min = min(coords_array_lut_x) - coords_array_lut_x_dist_margin
+        y_grid_min = min(coords_array_lut_y) - coords_array_lut_y_dist_margin
+        z_grid_min = min(coords_array_lut_z) - coords_array_lut_z_dist_margin
+        x_grid_max = max(coords_array_lut_x) + coords_array_lut_x_dist_margin
+        y_grid_max = max(coords_array_lut_y) + coords_array_lut_y_dist_margin
+        z_grid_max = max(coords_array_lut_z) + coords_array_lut_z_dist_margin
+
+        out_mesh.write('x_grid = np.array([ ' + str(x_grid_min) + ',' + str(x_grid_max) + ',' + str(x_grid_max) + ',' + str(x_grid_min) + ']) \n')
+        out_mesh.write('y_grid = np.array([ ' + str(y_grid_min) + ',' + str(y_grid_min) + ',' + str(y_grid_max) + ',' + str(y_grid_max) + ']) \n')
+        out_mesh.write('z_grid = np.array([ ' + str(z_grid_min) + ',' + str(z_grid_min) + ',' + str(z_grid_min) + ',' + str(z_grid_min) + ']) \n')
+
+        triangle_grid1 = [0,1,2]
+        triangle_grid2 = [0,2,3]
+
+        color_grid = [127,127,127,125]
+
+        out_mesh.write('triangles_grid = [' + str(triangle_grid1) + ',' + str(triangle_grid2) + ']' + '\n')
+        out_mesh.write('colors_grid = [' + str(color_grid) + ',' + str(color_grid) + ',' + str(color_grid) + ',' + str(color_grid) + ']' + '\n')
+        out_mesh.write('scalars_grid = [0,1,2,3]' + '\n')
+
+        out_mesh.write('\n')
+        out_mesh.write(mayavi2_comment_char + 'from mayavi import mlab' + '\n')
+        ##representation='wireframe'
+        out_mesh.write(mayavi2_comment_char + 'f = mlab.figure(figure=None, bgcolor=(1.0,1.0,1.0), fgcolor=None, engine=None, size=(400, 350))' + '\n')
+        out_mesh.write(mayavi2_comment_char + 's = mlab.triangular_mesh(x, y, z, triangles, scalars=scalars)' + '\n')
+        out_mesh.write(mayavi2_comment_char + 's.module_manager.scalar_lut_manager.lut.table = colors' + '\n')
+        out_mesh.write(mayavi2_comment_char + 's_grid = mlab.triangular_mesh(x_grid, y_grid, z_grid, triangles_grid, scalars=scalars_grid)' + '\n')
+        out_mesh.write(mayavi2_comment_char + 's_grid.module_manager.scalar_lut_manager.lut.table = colors_grid' + '\n')
+        out_mesh.write(mayavi2_comment_char + 't = mlab.text3d(' + str(x_grid_min) + ',' + str(y_grid_min) + ',' + str(z_grid_min) + ',' + "'labeltext'" + ',' + 'scale=1000' + ',' + 'color=(0.0,0.0,0.0)' + ')' + '\n')
+        out_mesh.write(mayavi2_comment_char + 'mlab.show()' + '\n')
 
 
 
-        colors_rgba = []
-        force_opaque = True
-        
-        
-        for nodecolor_id, nodecolor in enumerate(range(0,len(nodecoords_list_int_triples))):
 
-            node0_index = nodecolors_list_int_triples[nodecolor_id][0]
-            node1_index = nodecolors_list_int_triples[nodecolor_id][1]
-            node2_index = nodecolors_list_int_triples[nodecolor_id][2]
+        """
+        from mayavi import mlab
+        f = mlab.figure(figure=None, bgcolor=(1.0,1.0,1.0), fgcolor=None, engine=None, size=(400, 350))
+        s = mlab.triangular_mesh(x, y, z, triangles, scalars=scalars)
+        s.module_manager.scalar_lut_manager.lut.table = colors
 
-            node1_color_red, node1_color_green, node1_color_blue, node1_color_alpha = [colors_array_lut_red[node0_index], colors_array_lut_green[node0_index], colors_array_lut_blue[node0_index], colors_array_lut_alpha[node0_index]]
-            node2_color_red, node2_color_green, node2_color_blue, node2_color_alpha = [colors_array_lut_red[node1_index], colors_array_lut_green[node1_index], colors_array_lut_blue[node1_index], colors_array_lut_alpha[node1_index]]
-            node3_color_red, node3_color_green, node3_color_blue, node3_color_alpha = [colors_array_lut_red[node2_index], colors_array_lut_green[node2_index], colors_array_lut_blue[node2_index], colors_array_lut_alpha[node2_index]]
-
-            triangle_color_red = (node1_color_red + node2_color_red + node3_color_red) / 3.0
-            triangle_color_green = (node1_color_green + node2_color_green + node3_color_green) / 3.0
-            triangle_color_blue = (node1_color_blue + node2_color_blue + node3_color_blue) / 3.0
-            if force_opaque == False:            
-                triangle_color_alpha = (node1_color_alpha + node2_color_alpha + node3_color_alpha) / 3.0
-            else:
-                triangle_color_alpha = 1.0
-
-            colors_rgba_tuple = (round(float(nodecolor_id) / (len(nodecoords_list_int_triples)-1), 3), (round(triangle_color_red,3), round(triangle_color_green,3), round(triangle_color_blue,3), round(triangle_color_alpha,3)))
-            colors_rgba.append(colors_rgba_tuple)
+        mlab.savefig(filename = 'map3d.pdf')
+        #mlab.show()
 
 
+        import matplotlib.pyplot as plt
+        plt.plot([1,2,3,4])
+        plt.ylabel('some numbers')
+        #plt.show()
+        plt.savefig('foo.pdf')
 
-        out_mesh.write("cmap = LinearSegmentedColormap.from_list('cmap', " + str(colors_rgba) + ')' + '\n')
+        #import pyx
+        #c = pyx.canvas.canvas()
+        #c.insert(pyx.epsfile.epsfile(0, 0, "foo.eps", align="tl"))
+        #c.insert(pyx.epsfile.epsfile(0,0,"map3d.eps.gz", align="tr"))
+        #c.writePDFfile("combined.pdf")
 
-        out_mesh.write('' + '\n')
+
+        from PyPDF2 import PdfFileWriter, PdfFileReader
+
+        template = PdfFileReader(open('foo.pdf', 'rb'))
+        wpdf = PdfFileReader(open('map3d.pdf', 'rb'))
+        watermark = wpdf.getPage(0)
+        output = PdfFileWriter()
+
+        page = template.getPage(0)
+        page.mergePage(watermark)
+        output.addPage(page)
+
+        with open('combined.pdf', 'wb') as f:
+            output.write(f)
+        """
 
 
-        out_mesh.write('fig = plt.figure(figsize=(10,  10), dpi=72.0)' + '\n')
-        out_mesh.write("ax = fig.gca(projection='3d')" + '\n')
-        out_mesh.write('ax.set_xlim([' + str(min(coords_array_lut_x) - coords_array_lut_x_dist_margin) + ',' + str(max(coords_array_lut_x) + coords_array_lut_x_dist_margin) + '])' + '\n')
-        out_mesh.write('ax.set_ylim([' + str(min(coords_array_lut_y) - coords_array_lut_y_dist_margin) + ',' + str(max(coords_array_lut_y) + coords_array_lut_y_dist_margin) + '])' + '\n')
-        out_mesh.write('ax.set_zlim([' + str(min(coords_array_lut_z) - coords_array_lut_z_dist_margin) + ',' + str(max(coords_array_lut_z) + coords_array_lut_z_dist_margin) + '])' + '\n')
-        out_mesh.write("ax.set_aspect('equal')" + '\n')
-        out_mesh.write('collec = ax.plot_trisurf(x, y, z, triangles=triangles, cmap=cmap, linewidth=0.2, antialiased=True, shade=True)' + '\n')
-        out_mesh.write('collec.set_array(colors)' + '\n')
-        # Maximized window
-        #out_mesh.write('mng = plt.get_current_fig_manager()' + '\n')
-        #out_mesh.write('mng.resize(*mng.window.maxsize())' + '\n')
-        out_mesh.write('plt.show()' + '\n')
 
+
+
+        print("nodecoord_triple_cnt", nodecoord_triple_cnt)
+        print("colors_rgba_cnt", colors_rgba_cnt)
+        print("cmap_list_cnt", cmap_list_cnt)
+        print("colors_array_lut_red", len(colors_array_lut_red))
+        print("coords_array_lut_x", len(coords_array_lut_x))
 
 
 

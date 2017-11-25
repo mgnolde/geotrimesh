@@ -1,8 +1,8 @@
 # geoTriMesh
 
 
-geoTriMesh converts GIS data to colored 3D meshes (X3D).
-The library is intended to help to bridge the gap between geospatial data and 3D modelling.
+geoTriMesh converts GIS data to colored 3D meshes.
+It is intended to help to bridge the gap between geospatial data and 3D modelling.
 
 
 Installation:

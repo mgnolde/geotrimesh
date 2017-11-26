@@ -14,6 +14,9 @@ mesh_sk.py
 sync_to_vserver.sh
 generate_tocomee.py
 generate_sample_tandem.py
+setup.cfg
+setup.py
+generate_sample_srtm1.py
 
 build/
 .git/

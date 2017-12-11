@@ -47,7 +47,7 @@ class ElevationMesh(object):
 
     def generate_mesh(self, dem=None, orthophoto=None, boundaries=None, dem_nodata=None, orthophoto_nodata=None, tiles_size=None, tiles_bbox=None, mesh_prefix='out', 
                         mesh_path=os.path.join(os.getcwd(),'out'), mesh_shapefile=False, scale_xy=None, z_exaggeration=1.0, projection='orig', centering=True, indexed_colors=False, 
-                        coloring_mode='orthophoto', mesh_format='x3d', orthophoto_bitdepth=8):
+                        coloring_mode='orthophoto', mesh_format='x3d', orthophoto_bitdepth=8, tiles_naming_convention='xy', force_out_mesh_overwrite=True):
         
         if dem==None:
             logger.info('A DEM is required. Exiting.')
@@ -166,13 +166,18 @@ class ElevationMesh(object):
                 tile_x_center = tile_x_coord + (tiles_size / 2)
                 tile_y_center = tile_y_coord + (tiles_size / 2)
 
-                if (tile_x_center >= tiles_bbox_x_min and tile_x_center <= tiles_bbox_x_max and 
-                  tile_y_center >= tiles_bbox_y_min and tile_y_center <= tiles_bbox_y_max):
+                if (tiles_bbox == None or (tile_x_center >= tiles_bbox_x_min and tile_x_center <= tiles_bbox_x_max and 
+                  tile_y_center >= tiles_bbox_y_min and tile_y_center <= tiles_bbox_y_max)):
            
 
-                    if tiles_size < in_dem_diff_max:
-                        out_triangles_filename = os.path.join(out_triangles_path, out_triangles_filename_prefix + '_' + str(tile_x) + '_' + str(tile_y) + '.shp')
-                        out_mesh_filename = os.path.join(out_mesh_path, out_mesh_filename_prefix + '_' + str(tile_x) + '_' + str(tile_y) + '.' + mesh_format)
+                    if tiles_size != None:
+                        if tiles_naming_convention == 'sequential':
+                            out_triangles_filename = os.path.join(out_triangles_path, out_triangles_filename_prefix + '_' + str((tile_y * tile_x) + tile_x) + '_' + str(tile_y) + '.shp')
+                            out_mesh_filename = os.path.join(out_mesh_path, out_mesh_filename_prefix + '_' + str((tile_y * tile_x) + tile_x) + '.' + mesh_format)
+                        else:
+                            out_triangles_filename = os.path.join(out_triangles_path, out_triangles_filename_prefix + '_' + str(tile_y) + '_' + str(tile_x) + '.shp')
+                            out_mesh_filename = os.path.join(out_mesh_path, out_mesh_filename_prefix + '_' + str(tile_y) + '_' + str(tile_x) + '.' + mesh_format)
+
                     else:
                         out_triangles_filename = os.path.join(out_triangles_path, out_triangles_filename_prefix + '.shp')
                         out_mesh_filename = os.path.join(out_mesh_path, out_mesh_filename_prefix + '.' + mesh_format)
@@ -234,156 +239,157 @@ class ElevationMesh(object):
             
             
             
+                    if not os.path.isfile(out_triangles_filename) or force_out_mesh_overwrite==True:
           
             
-                    
-                    ## Open output vector shape
-                    out_triangles_driver = ogr.GetDriverByName("ESRI Shapefile")
-                    
-                    if os.path.exists(out_triangles_filename):
-                        out_triangles_driver.DeleteDataSource(out_triangles_filename)
-                    
-                    out_triangles = out_triangles_driver.CreateDataSource(out_triangles_filename)
-                    #out_triangles_spatialref = ogr.osr.SpatialReference()
-                    out_triangles_spatialref = in_boundaries_spatialref
-                    
-                    out_triangles_field_a_x = ogr.FieldDefn("A_X", ogr.OFTReal)
-                    out_triangles_field_a_y = ogr.FieldDefn("A_Y", ogr.OFTReal)
-                    out_triangles_field_a_z = ogr.FieldDefn("A_Z", ogr.OFTReal)
-                    out_triangles_field_a_red = ogr.FieldDefn("A_RED", ogr.OFTInteger)
-                    out_triangles_field_a_green = ogr.FieldDefn("A_GREEN", ogr.OFTInteger)
-                    out_triangles_field_a_blue = ogr.FieldDefn("A_BLUE", ogr.OFTInteger)
-                    out_triangles_field_a_alpha = ogr.FieldDefn("A_ALPHA", ogr.OFTInteger)
-                    out_triangles_field_b_x = ogr.FieldDefn("B_X", ogr.OFTReal)
-                    out_triangles_field_b_y = ogr.FieldDefn("B_Y", ogr.OFTReal)
-                    out_triangles_field_b_z = ogr.FieldDefn("B_Z", ogr.OFTReal)
-                    out_triangles_field_b_red = ogr.FieldDefn("B_RED", ogr.OFTInteger)
-                    out_triangles_field_b_green = ogr.FieldDefn("B_GREEN", ogr.OFTInteger)
-                    out_triangles_field_b_blue = ogr.FieldDefn("B_BLUE", ogr.OFTInteger)
-                    out_triangles_field_b_alpha = ogr.FieldDefn("B_ALPHA", ogr.OFTInteger)
-                    out_triangles_field_c_x = ogr.FieldDefn("C_X", ogr.OFTReal)
-                    out_triangles_field_c_y = ogr.FieldDefn("C_Y", ogr.OFTReal)
-                    out_triangles_field_c_z = ogr.FieldDefn("C_Z", ogr.OFTReal)
-                    out_triangles_field_c_red = ogr.FieldDefn("C_RED", ogr.OFTInteger)
-                    out_triangles_field_c_green = ogr.FieldDefn("C_GREEN", ogr.OFTInteger)
-                    out_triangles_field_c_blue = ogr.FieldDefn("C_BLUE", ogr.OFTInteger)
-                    out_triangles_field_c_alpha = ogr.FieldDefn("C_ALPHA", ogr.OFTInteger)
-                    
-                    out_triangles_layer = out_triangles.CreateLayer('triangles', out_triangles_spatialref, geom_type=ogr.wkbPolygon)
-                    out_triangles_layer.CreateField(out_triangles_field_a_x)
-                    out_triangles_layer.CreateField(out_triangles_field_a_y)
-                    out_triangles_layer.CreateField(out_triangles_field_a_z)
-                    out_triangles_layer.CreateField(out_triangles_field_a_red)
-                    out_triangles_layer.CreateField(out_triangles_field_a_green)
-                    out_triangles_layer.CreateField(out_triangles_field_a_blue)
-                    out_triangles_layer.CreateField(out_triangles_field_a_alpha)
-                    out_triangles_layer.CreateField(out_triangles_field_b_x)
-                    out_triangles_layer.CreateField(out_triangles_field_b_y)
-                    out_triangles_layer.CreateField(out_triangles_field_b_z)
-                    out_triangles_layer.CreateField(out_triangles_field_b_red)
-                    out_triangles_layer.CreateField(out_triangles_field_b_green)
-                    out_triangles_layer.CreateField(out_triangles_field_b_blue)
-                    out_triangles_layer.CreateField(out_triangles_field_b_alpha)
-                    out_triangles_layer.CreateField(out_triangles_field_c_x)
-                    out_triangles_layer.CreateField(out_triangles_field_c_y)
-                    out_triangles_layer.CreateField(out_triangles_field_c_z)
-                    out_triangles_layer.CreateField(out_triangles_field_c_red)
-                    out_triangles_layer.CreateField(out_triangles_field_c_green)
-                    out_triangles_layer.CreateField(out_triangles_field_c_blue)
-                    out_triangles_layer.CreateField(out_triangles_field_c_alpha)
-                    
-                
                         
-                    in_tile_ring = ogr.Geometry(ogr.wkbLinearRing)
-                    in_tile_ring.AddPoint(tile_x_coord, tile_y_coord)
-                    in_tile_ring.AddPoint(tile_x_coord + tiles_size, tile_y_coord)
-                    in_tile_ring.AddPoint(tile_x_coord + tiles_size, tile_y_coord + tiles_size)
-                    in_tile_ring.AddPoint(tile_x_coord, tile_y_coord + tiles_size)
-                    in_tile_ring.AddPoint(tile_x_coord, tile_y_coord)
-                    in_tile_bbox = ogr.Geometry(ogr.wkbPolygon)
-                    in_tile_bbox.AddGeometry(in_tile_ring)
-            
-    
-                    logger.info('iterate over geometries in boundaries vector file')
-            
-
-                    for in_boundaries_feat_id, in_boundaries_feat in enumerate(in_boundaries_layer):
-          
-                        in_boundaries_geom = in_boundaries_feat.GetGeometryRef()
-                        in_boundaries_geomtype = in_boundaries_geom.GetGeometryName()
-
-
-                        #status_perc = (((tile_x * tile_y * in_boundaries_feat_id) + in_boundaries_feat_id) * 100) / (in_dem_tiles_x_total * in_dem_tiles_y_total * in_boundaries_featcount)
-                        #status_desc = 'Calculating tile ' + str((tile_x * tile_y) + tile_y) + ' of ' + str(in_dem_tiles_x_total * in_dem_tiles_y_total)
-                        #status_dict = {'percent': status_perc,
-                        #            'status_desc': status_desc }
-
-                        #with open(out_log_filename, 'w') as logfile:
-                        #    json.dump(status_dict, logfile)
-            
-
-
-            
-                        #print(in_boundaries_spatialref.GetAttrValue("PROJCS", 0))
-            
-                        #if str(in_boundaries_spatialref.GetAttrValue("PROJCS", 0)).lower() != 'none':
-    
-                        #    logger.info('unprojected geometry')
-                        #    in_geometry = in_boundaries_geom.Clone()        
-    
-                        #else:
+                        ## Open output vector shape
+                        out_triangles_driver = ogr.GetDriverByName("ESRI Shapefile")
                         
-                        in_geometry = in_tile_bbox.Intersection(in_boundaries_geom)
-                            
-    
-                            
-                        in_geometry_feature_defn = in_boundaries_layer.GetLayerDefn()
-    
-    
-    
-                        if in_geometry != None and str(in_geometry).upper() != 'GEOMETRYCOLLECTION EMPTY':
-                            out_triangles_minmax_geom_total = self.ogr_to_elevation_mesh(in_dem, in_orthophoto, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_orthophoto_nodata_ext, out_triangles_layer, indexed_colors, coloring_mode, in_dem_stats_minmax, in_orthophoto_stats_minmax, mesh_format, out_log_filename, orthophoto_bitdepth)
-                            
-    
-                            out_triangles_x_min_geom_total, out_triangles_x_max_geom_total, out_triangles_y_min_geom_total, out_triangles_y_max_geom_total, out_triangles_z_min_geom_total, out_triangles_z_max_geom_total = out_triangles_minmax_geom_total
-    
-                            #out_triangles_x_min_boundaries_total = min(out_triangles_x_min_boundaries_total, out_triangles_x_min_geom_total)
-                            #out_triangles_x_max_boundaries_total = max(out_triangles_x_max_boundaries_total, out_triangles_x_max_geom_total)
-                            #out_triangles_y_min_boundaries_total = min(out_triangles_y_min_boundaries_total, out_triangles_y_min_geom_total)
-                            #out_triangles_y_max_boundaries_total = max(out_triangles_y_max_boundaries_total, out_triangles_y_max_geom_total)
-                            out_triangles_z_min_boundaries_total = min(out_triangles_z_min_boundaries_total, out_triangles_z_min_geom_total)
-                            out_triangles_z_max_boundaries_total = max(out_triangles_z_max_boundaries_total, out_triangles_z_max_geom_total)
-    
-       
-                    out_triangles_minmax_boundaries_total = [out_triangles_x_min_boundaries_total, out_triangles_x_max_boundaries_total, 
-                                            out_triangles_y_min_boundaries_total, out_triangles_y_max_boundaries_total, 
-                                            out_triangles_z_min_boundaries_total, out_triangles_z_max_boundaries_total]
-    
-            
-                    out_triangles.Destroy()                    
-                    in_boundaries.Destroy()
-            
-                    in_triangles_driver = ogr.GetDriverByName("ESRI Shapefile")
-                    in_triangles = in_triangles_driver.Open(out_triangles_filename, 0)
-                    in_triangles_layer = in_triangles.GetLayer()
-            
-                    if in_triangles_layer.GetFeatureCount() > 0:
-                        self.conv_triangle_shape_to_mesh(in_triangles_layer, out_mesh_filename, indexed_colors, scale_xy, z_exaggeration, projection, centering, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_boundaries_total, mesh_format, in_boundaries_centroid, orthophoto_bitdepth)
-            
-                    in_triangles.Destroy()
-            
-                    if mesh_shapefile == False:
-                        ## Delete temporary shapefile (triangles)
                         if os.path.exists(out_triangles_filename):
-                            in_triangles_driver.DeleteDataSource(out_triangles_filename)
+                            out_triangles_driver.DeleteDataSource(out_triangles_filename)
+                        
+                        out_triangles = out_triangles_driver.CreateDataSource(out_triangles_filename)
+                        #out_triangles_spatialref = ogr.osr.SpatialReference()
+                        out_triangles_spatialref = in_boundaries_spatialref
+                        
+                        out_triangles_field_a_x = ogr.FieldDefn("A_X", ogr.OFTReal)
+                        out_triangles_field_a_y = ogr.FieldDefn("A_Y", ogr.OFTReal)
+                        out_triangles_field_a_z = ogr.FieldDefn("A_Z", ogr.OFTReal)
+                        out_triangles_field_a_red = ogr.FieldDefn("A_RED", ogr.OFTInteger)
+                        out_triangles_field_a_green = ogr.FieldDefn("A_GREEN", ogr.OFTInteger)
+                        out_triangles_field_a_blue = ogr.FieldDefn("A_BLUE", ogr.OFTInteger)
+                        out_triangles_field_a_alpha = ogr.FieldDefn("A_ALPHA", ogr.OFTInteger)
+                        out_triangles_field_b_x = ogr.FieldDefn("B_X", ogr.OFTReal)
+                        out_triangles_field_b_y = ogr.FieldDefn("B_Y", ogr.OFTReal)
+                        out_triangles_field_b_z = ogr.FieldDefn("B_Z", ogr.OFTReal)
+                        out_triangles_field_b_red = ogr.FieldDefn("B_RED", ogr.OFTInteger)
+                        out_triangles_field_b_green = ogr.FieldDefn("B_GREEN", ogr.OFTInteger)
+                        out_triangles_field_b_blue = ogr.FieldDefn("B_BLUE", ogr.OFTInteger)
+                        out_triangles_field_b_alpha = ogr.FieldDefn("B_ALPHA", ogr.OFTInteger)
+                        out_triangles_field_c_x = ogr.FieldDefn("C_X", ogr.OFTReal)
+                        out_triangles_field_c_y = ogr.FieldDefn("C_Y", ogr.OFTReal)
+                        out_triangles_field_c_z = ogr.FieldDefn("C_Z", ogr.OFTReal)
+                        out_triangles_field_c_red = ogr.FieldDefn("C_RED", ogr.OFTInteger)
+                        out_triangles_field_c_green = ogr.FieldDefn("C_GREEN", ogr.OFTInteger)
+                        out_triangles_field_c_blue = ogr.FieldDefn("C_BLUE", ogr.OFTInteger)
+                        out_triangles_field_c_alpha = ogr.FieldDefn("C_ALPHA", ogr.OFTInteger)
+                        
+                        out_triangles_layer = out_triangles.CreateLayer('triangles', out_triangles_spatialref, geom_type=ogr.wkbPolygon)
+                        out_triangles_layer.CreateField(out_triangles_field_a_x)
+                        out_triangles_layer.CreateField(out_triangles_field_a_y)
+                        out_triangles_layer.CreateField(out_triangles_field_a_z)
+                        out_triangles_layer.CreateField(out_triangles_field_a_red)
+                        out_triangles_layer.CreateField(out_triangles_field_a_green)
+                        out_triangles_layer.CreateField(out_triangles_field_a_blue)
+                        out_triangles_layer.CreateField(out_triangles_field_a_alpha)
+                        out_triangles_layer.CreateField(out_triangles_field_b_x)
+                        out_triangles_layer.CreateField(out_triangles_field_b_y)
+                        out_triangles_layer.CreateField(out_triangles_field_b_z)
+                        out_triangles_layer.CreateField(out_triangles_field_b_red)
+                        out_triangles_layer.CreateField(out_triangles_field_b_green)
+                        out_triangles_layer.CreateField(out_triangles_field_b_blue)
+                        out_triangles_layer.CreateField(out_triangles_field_b_alpha)
+                        out_triangles_layer.CreateField(out_triangles_field_c_x)
+                        out_triangles_layer.CreateField(out_triangles_field_c_y)
+                        out_triangles_layer.CreateField(out_triangles_field_c_z)
+                        out_triangles_layer.CreateField(out_triangles_field_c_red)
+                        out_triangles_layer.CreateField(out_triangles_field_c_green)
+                        out_triangles_layer.CreateField(out_triangles_field_c_blue)
+                        out_triangles_layer.CreateField(out_triangles_field_c_alpha)
+                        
                     
-                    try:
-                        os.remove(out_log_filename)
-                    except:
-                        pass
+                            
+                        in_tile_ring = ogr.Geometry(ogr.wkbLinearRing)
+                        in_tile_ring.AddPoint(tile_x_coord, tile_y_coord)
+                        in_tile_ring.AddPoint(tile_x_coord + tiles_size, tile_y_coord)
+                        in_tile_ring.AddPoint(tile_x_coord + tiles_size, tile_y_coord + tiles_size)
+                        in_tile_ring.AddPoint(tile_x_coord, tile_y_coord + tiles_size)
+                        in_tile_ring.AddPoint(tile_x_coord, tile_y_coord)
+                        in_tile_bbox = ogr.Geometry(ogr.wkbPolygon)
+                        in_tile_bbox.AddGeometry(in_tile_ring)
+                
         
-
-
+                        logger.info('iterate over geometries in boundaries vector file')
+                
+    
+                        for in_boundaries_feat_id, in_boundaries_feat in enumerate(in_boundaries_layer):
+              
+                            in_boundaries_geom = in_boundaries_feat.GetGeometryRef()
+                            in_boundaries_geomtype = in_boundaries_geom.GetGeometryName()
+    
+    
+                            #status_perc = (((tile_x * tile_y * in_boundaries_feat_id) + in_boundaries_feat_id) * 100) / (in_dem_tiles_x_total * in_dem_tiles_y_total * in_boundaries_featcount)
+                            #status_desc = 'Calculating tile ' + str((tile_x * tile_y) + tile_y) + ' of ' + str(in_dem_tiles_x_total * in_dem_tiles_y_total)
+                            #status_dict = {'percent': status_perc,
+                            #            'status_desc': status_desc }
+    
+                            #with open(out_log_filename, 'w') as logfile:
+                            #    json.dump(status_dict, logfile)
+                
+    
+    
+                
+                            #print(in_boundaries_spatialref.GetAttrValue("PROJCS", 0))
+                
+                            #if str(in_boundaries_spatialref.GetAttrValue("PROJCS", 0)).lower() != 'none':
+        
+                            #    logger.info('unprojected geometry')
+                            #    in_geometry = in_boundaries_geom.Clone()        
+        
+                            #else:
+                            
+                            in_geometry = in_tile_bbox.Intersection(in_boundaries_geom)
+                                
+        
+                                
+                            in_geometry_feature_defn = in_boundaries_layer.GetLayerDefn()
+        
+        
+        
+                            if in_geometry != None and str(in_geometry).upper() != 'GEOMETRYCOLLECTION EMPTY':
+                                out_triangles_minmax_geom_total = self.ogr_to_elevation_mesh(in_dem, in_orthophoto, in_geometry, in_boundaries_spatialref, in_geometry_feature_defn, in_dem_nodata_ext, in_orthophoto_nodata_ext, out_triangles_layer, indexed_colors, coloring_mode, in_dem_stats_minmax, in_orthophoto_stats_minmax, mesh_format, out_log_filename, orthophoto_bitdepth)
+                                
+        
+                                out_triangles_x_min_geom_total, out_triangles_x_max_geom_total, out_triangles_y_min_geom_total, out_triangles_y_max_geom_total, out_triangles_z_min_geom_total, out_triangles_z_max_geom_total = out_triangles_minmax_geom_total
+        
+                                #out_triangles_x_min_boundaries_total = min(out_triangles_x_min_boundaries_total, out_triangles_x_min_geom_total)
+                                #out_triangles_x_max_boundaries_total = max(out_triangles_x_max_boundaries_total, out_triangles_x_max_geom_total)
+                                #out_triangles_y_min_boundaries_total = min(out_triangles_y_min_boundaries_total, out_triangles_y_min_geom_total)
+                                #out_triangles_y_max_boundaries_total = max(out_triangles_y_max_boundaries_total, out_triangles_y_max_geom_total)
+                                out_triangles_z_min_boundaries_total = min(out_triangles_z_min_boundaries_total, out_triangles_z_min_geom_total)
+                                out_triangles_z_max_boundaries_total = max(out_triangles_z_max_boundaries_total, out_triangles_z_max_geom_total)
+        
+           
+                        out_triangles_minmax_boundaries_total = [out_triangles_x_min_boundaries_total, out_triangles_x_max_boundaries_total, 
+                                                out_triangles_y_min_boundaries_total, out_triangles_y_max_boundaries_total, 
+                                                out_triangles_z_min_boundaries_total, out_triangles_z_max_boundaries_total]
+        
+                
+                        out_triangles.Destroy()                    
+                        in_boundaries.Destroy()
+                
+                        in_triangles_driver = ogr.GetDriverByName("ESRI Shapefile")
+                        in_triangles = in_triangles_driver.Open(out_triangles_filename, 0)
+                        in_triangles_layer = in_triangles.GetLayer()
+                
+                        if in_triangles_layer.GetFeatureCount() > 0:
+                            self.conv_triangle_shape_to_mesh(in_triangles_layer, out_mesh_filename, indexed_colors, scale_xy, z_exaggeration, projection, centering, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_boundaries_total, mesh_format, in_boundaries_centroid, orthophoto_bitdepth, force_out_mesh_overwrite)
+                
+                        in_triangles.Destroy()
+                
+                        if mesh_shapefile == False:
+                            ## Delete temporary shapefile (triangles)
+                            if os.path.exists(out_triangles_filename):
+                                in_triangles_driver.DeleteDataSource(out_triangles_filename)
+                        
+                        try:
+                            os.remove(out_log_filename)
+                        except:
+                            pass
+            
+    
+    
 
 
     def parse_polygon(self, in_in_boundary_polygon, in_dem, in_orthophoto, out_triangles_layer, out_triangles_layer_feature_defn, in_dem_nodata_ext, in_orthophoto_nodata_ext, in_dem_res_x, in_dem_res_y, in_dem_extent_x_min, in_dem_extent_x_max, in_dem_extent_y_min, in_dem_extent_y_max, in_dem_cols, in_dem_rows,
@@ -1075,46 +1081,50 @@ class ElevationMesh(object):
 
 
 
-    def conv_triangle_shape_to_mesh(self, in_triangles_layer, out_mesh_filename, indexed_colors, scale_xy, z_exaggeration, projection, centering, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_boundaries_total, mesh_format, in_boundaries_centroid, orthophoto_bitdepth):
+    def conv_triangle_shape_to_mesh(self, in_triangles_layer, out_mesh_filename, indexed_colors, scale_xy, z_exaggeration, projection, centering, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_boundaries_total, mesh_format, in_boundaries_centroid, orthophoto_bitdepth, force_out_mesh_overwrite):
+
+        print("TEST")
 
         logger.info('converting triangle shape to x3d')
       
         in_triangles_feature_count = in_triangles_layer.GetFeatureCount()
         logger.info('feature_count: %s', in_triangles_feature_count)
-               
+
+
+       
         out_mesh = open(out_mesh_filename, 'w')
         logger.info(out_mesh_filename)
-        
+    
         coords_array_x = numpy.empty(in_triangles_feature_count*3) * numpy.nan
         coords_array_y = numpy.empty(in_triangles_feature_count*3) * numpy.nan
         coords_array_z = numpy.empty(in_triangles_feature_count*3) * numpy.nan
-        
+    
         coords_array_lut_x = numpy.empty(in_triangles_feature_count*3) * numpy.nan
         coords_array_lut_y = numpy.empty(in_triangles_feature_count*3) * numpy.nan
         coords_array_lut_z = numpy.empty(in_triangles_feature_count*3) * numpy.nan
-        
-        
+    
+    
         colors_array_red = numpy.empty(in_triangles_feature_count*3) * numpy.nan
         colors_array_green = numpy.empty(in_triangles_feature_count*3) * numpy.nan
         colors_array_blue = numpy.empty(in_triangles_feature_count*3) * numpy.nan
         colors_array_alpha = numpy.empty(in_triangles_feature_count*3) * numpy.nan
-        
+    
         colors_array_lut_red = numpy.empty(in_triangles_feature_count*3)* numpy.nan
         colors_array_lut_green = numpy.empty(in_triangles_feature_count*3) * numpy.nan
         colors_array_lut_blue = numpy.empty(in_triangles_feature_count*3) * numpy.nan
         colors_array_lut_alpha = numpy.empty(in_triangles_feature_count*3) * numpy.nan
-       
+   
 
         normals_array_lut_x = numpy.empty(in_triangles_feature_count*3)* numpy.nan
         normals_array_lut_y = numpy.empty(in_triangles_feature_count*3)* numpy.nan
         normals_array_lut_z = numpy.empty(in_triangles_feature_count*3)* numpy.nan
 
-        
+    
         nodecoords_array = numpy.empty(in_triangles_feature_count*3) * numpy.nan
         nodecolors_array = numpy.empty(in_triangles_feature_count*3) * numpy.nan
         nodenormals_array = numpy.empty(in_triangles_feature_count*3) * numpy.nan
-        
-        
+    
+    
         triangles_x_min_total, triangles_x_max_total, triangles_y_min_total, triangles_y_max_total = in_triangles_layer.GetExtent()
 
 
@@ -1122,8 +1132,8 @@ class ElevationMesh(object):
 
         ## Loop through triangle-features and write every
         ## x,y, and z - coordinate into one distinct numpy array
-      
-        
+  
+    
         for in_triangles_feature_id,in_triangles_feature in enumerate(in_triangles_layer):
             in_triangles_polygon = in_triangles_feature.GetGeometryRef()
             geom_firstlevel = in_triangles_polygon.GetGeometryRef(0)
@@ -1136,7 +1146,7 @@ class ElevationMesh(object):
             point_c_x = in_triangles_feature.GetField("C_X")
             point_c_y = in_triangles_feature.GetField("C_Y")
             point_c_z = in_triangles_feature.GetField("C_Z")
-            
+        
             point_a_red = in_triangles_feature.GetField("A_RED")
             point_a_green = in_triangles_feature.GetField("A_GREEN")
             point_a_blue = in_triangles_feature.GetField("A_BLUE")
@@ -1149,22 +1159,22 @@ class ElevationMesh(object):
             point_c_green = in_triangles_feature.GetField("C_GREEN")
             point_c_blue = in_triangles_feature.GetField("C_BLUE")
             point_c_alpha = in_triangles_feature.GetField("C_ALPHA")
-            
-       
-              
+        
+   
+          
             coords_array_x[(in_triangles_feature_id*3) + 0] = round(point_a_x,16)
             coords_array_y[(in_triangles_feature_id*3) + 0] = round(point_a_y,16)
             coords_array_z[(in_triangles_feature_id*3) + 0] = round(point_a_z,16)
-        
+    
             coords_array_x[(in_triangles_feature_id*3) + 1] = round(point_b_x,16)
             coords_array_y[(in_triangles_feature_id*3) + 1] = round(point_b_y,16)
             coords_array_z[(in_triangles_feature_id*3) + 1] = round(point_b_z,16)
-        
+    
             coords_array_x[(in_triangles_feature_id*3) + 2] = round(point_c_x,16)
             coords_array_y[(in_triangles_feature_id*3) + 2] = round(point_c_y,16)
             coords_array_z[(in_triangles_feature_id*3) + 2] = round(point_c_z,16)
+    
         
-            
             colors_array_red[(in_triangles_feature_id*3) + 0] = round(point_a_red,2)
             colors_array_green[(in_triangles_feature_id*3) + 0] = round(point_a_green,2)
             colors_array_blue[(in_triangles_feature_id*3) + 0] = round(point_a_blue,2)
@@ -1174,122 +1184,57 @@ class ElevationMesh(object):
             colors_array_green[(in_triangles_feature_id*3) + 1] = round(point_b_green,2)
             colors_array_blue[(in_triangles_feature_id*3) + 1] = round(point_b_blue,2)
             colors_array_alpha[(in_triangles_feature_id*3) + 1] = round(point_b_alpha,2)
-        
+    
             colors_array_red[(in_triangles_feature_id*3) + 2] = round(point_c_red,2)
             colors_array_green[(in_triangles_feature_id*3) + 2] = round(point_c_green,2)
             colors_array_blue[(in_triangles_feature_id*3) + 2] = round(point_c_blue,2)
             colors_array_alpha[(in_triangles_feature_id*3) + 2] = round(point_c_alpha,2)
 
-        
+    
         #logger.info('assign colors')
-        
+    
         ## Loop through the x,y, and z - numpy arrays, search for duplicates and replace
         ## them by NAN, write the found unique coord combinations in x,y,z, lists and the node id in another list
         unique_nodecoords_cnt=0
         unique_nodecolors_cnt=0
-        
+    
+
+        indexed_colors = False
         if indexed_colors == False:
-        
+    
             for coord_id in range(0,len(coords_array_x)):
                 #logger.info coord_id, '(', len(coords_array_x), ')'
-                
+            
                 coord_x, coord_y, coord_z = coords_array_x[coord_id], coords_array_y[coord_id], coords_array_z[coord_id]
                 color_red, color_green, color_blue, color_alpha = colors_array_red[coord_id], colors_array_green[coord_id], colors_array_blue[coord_id], colors_array_alpha[coord_id]
-                
             
+        
                 if not numpy.isnan(coord_x):
-                
+            
                     coord_locations = numpy.where(  ( coords_array_x[:] == round(coord_x,16) ) &
                                                     ( coords_array_y[:] == round(coord_y,16) ) &
                                                     ( coords_array_z[:] == round(coord_z,16) ) )
-            
+        
                     #for coord_location in coord_locations:
                     coords_array_x[coord_locations] = numpy.nan
                     coords_array_y[coord_locations] = numpy.nan
                     coords_array_z[coord_locations] = numpy.nan
-            
+        
                     nodecoords_array[coord_locations] = unique_nodecoords_cnt
-            
+        
                     coords_array_lut_x[unique_nodecoords_cnt] = coord_x
                     coords_array_lut_y[unique_nodecoords_cnt] = coord_y
                     coords_array_lut_z[unique_nodecoords_cnt] = coord_z
-            
+        
                     colors_array_lut_red[unique_nodecoords_cnt] = color_red
                     colors_array_lut_green[unique_nodecoords_cnt] = color_green
                     colors_array_lut_blue[unique_nodecoords_cnt] = color_blue
                     colors_array_lut_alpha[unique_nodecoords_cnt] = color_alpha
-            
+        
                     unique_nodecoords_cnt+=1
-                
-        
-        
-        if indexed_colors == True:
-        
-            for coord_id in range(0,len(coords_array_x)):
-                #logger.info coord_id, '(', len(coords_array_x), ')'
-        
-                coord_x, coord_y, coord_z = coords_array_x[coord_id], coords_array_y[coord_id], coords_array_z[coord_id]
-                color_red, color_green, color_blue, color_alpha = colors_array_red[coord_id], colors_array_green[coord_id], colors_array_blue[coord_id], colors_array_alpha[coord_id]
-                
             
-                if not numpy.isnan(coord_x):
-                
-                    coord_locations = numpy.where(  ( coords_array_x[:] == round(coord_x,16) ) &
-                                                    ( coords_array_y[:] == round(coord_y,16) ) &
-                                                    ( coords_array_z[:] == round(coord_z,16) ) )
-            
-                    #for coord_location in coord_locations:
-                    #    coords_array_x[coord_location] = numpy.nan
-                    #    coords_array_y[coord_location] = numpy.nan
-                    #    coords_array_z[coord_location] = numpy.nan
-                    #
-                    #    nodecoords_array[coord_location] = unique_nodecoords_cnt
-
-                    if len(coord_locations[0]) > 0:
-
-                        coords_array_x[coord_locations] = numpy.nan
-                        coords_array_y[coord_locations] = numpy.nan
-                        coords_array_z[coord_locations] = numpy.nan
-            
-                        nodecoords_array[coord_locations] = unique_nodecoords_cnt
-            
-            
-                        coords_array_lut_x[unique_nodecoords_cnt] = coord_x
-                        coords_array_lut_y[unique_nodecoords_cnt] = coord_y
-                        coords_array_lut_z[unique_nodecoords_cnt] = coord_z
-            
-                        unique_nodecoords_cnt+=1
-            
-            
-            
-                if not numpy.isnan(color_red):
-            
-                    color_locations = numpy.where(  ( colors_array_red[:] == round(color_red,2) ) &
-                                                    ( colors_array_green[:] == round(color_green,2) ) &
-                                                    ( colors_array_blue[:] == round(color_blue,2) ) & 
-                                                    ( colors_array_alpha[:] == round(color_alpha,2) ) )
-
-
-
-                    if len(color_locations[0]) > 0:
-
-                        colors_array_red[color_locations] = numpy.nan
-                        colors_array_green[color_locations] = numpy.nan
-                        colors_array_blue[color_locations] = numpy.nan
-                        colors_array_alpha[color_locations] = numpy.nan
-            
-                        nodecolors_array[color_locations] = unique_nodecolors_cnt
-
-            
-                        colors_array_lut_red[unique_nodecoords_cnt] = color_red
-                        colors_array_lut_green[unique_nodecoords_cnt] = color_green
-                        colors_array_lut_blue[unique_nodecoords_cnt] = color_blue
-                        colors_array_lut_alpha[unique_nodecoords_cnt] = color_alpha
-
-                        unique_nodecolors_cnt+=1
-        
-
-        
+    
+    
         coords_array_lut_x_clean = coords_array_lut_x[numpy.logical_not(numpy.isnan(coords_array_lut_x))]
         coords_array_lut_y_clean = coords_array_lut_y[numpy.logical_not(numpy.isnan(coords_array_lut_y))]
         coords_array_lut_z_clean = coords_array_lut_z[numpy.logical_not(numpy.isnan(coords_array_lut_z))]
@@ -1300,14 +1245,29 @@ class ElevationMesh(object):
         colors_array_lut_alpha_clean = colors_array_lut_alpha[numpy.logical_not(numpy.isnan(colors_array_lut_alpha))]
 
 
+        ##15: darker
+        ##17: brighter
 
+        colors_red_perc_low = 0
+        colors_red_perc_high = (256 * 256) / 16
+        colors_green_perc_low = 0
+        colors_green_perc_high = (256 * 256) / 16
+        colors_blue_perc_low = 0
+        colors_blue_perc_high = (256 * 256) / 16
 
-        colors_red_perc_low = numpy.nanpercentile(colors_array_lut_red_clean, 1)
-        colors_red_perc_high = numpy.nanpercentile(colors_array_lut_red_clean, 99)
-        colors_green_perc_low = numpy.nanpercentile(colors_array_lut_green_clean, 1)
-        colors_green_perc_high = numpy.nanpercentile(colors_array_lut_green_clean, 99)
-        colors_blue_perc_low = numpy.nanpercentile(colors_array_lut_blue_clean, 1)
-        colors_blue_perc_high = numpy.nanpercentile(colors_array_lut_blue_clean, 99)
+        #colors_red_perc_low = numpy.nanmin(colors_array_lut_red_clean)
+        #colors_red_perc_high = numpy.nanmax(colors_array_lut_red_clean)
+        #colors_green_perc_low = numpy.nanmin(colors_array_lut_green_clean)
+        #colors_green_perc_high = numpy.nanmax(colors_array_lut_green_clean)
+        #colors_blue_perc_low = numpy.nanmin(colors_array_lut_blue_clean)
+        #colors_blue_perc_high = numpy.nanmax(colors_array_lut_blue_clean)
+
+        #colors_red_perc_low = numpy.nanpercentile(colors_array_lut_red_clean, 1)
+        #colors_red_perc_high = numpy.nanpercentile(colors_array_lut_red_clean, 99)
+        #colors_green_perc_low = numpy.nanpercentile(colors_array_lut_green_clean, 1)
+        #colors_green_perc_high = numpy.nanpercentile(colors_array_lut_green_clean, 99)
+        #colors_blue_perc_low = numpy.nanpercentile(colors_array_lut_blue_clean, 1)
+        #colors_blue_perc_high = numpy.nanpercentile(colors_array_lut_blue_clean, 99)
 
         print('orthophoto_bitdepth: ', orthophoto_bitdepth)
         for color_id, (color_red, color_green, color_blue) in enumerate(zip(colors_array_lut_red_clean, colors_array_lut_green_clean, colors_array_lut_blue_clean)):
@@ -1320,13 +1280,13 @@ class ElevationMesh(object):
                     color_red = colors_red_perc_high
 
                 if color_green < colors_green_perc_low:
-                    color_green = colors_green_perc_high
-                if color_green > colors_green_perc_low:
+                    color_green = colors_green_perc_low
+                if color_green > colors_green_perc_high:
                     color_green = colors_green_perc_high
 
                 if color_blue < colors_blue_perc_low:
-                    color_blue = colors_blue_perc_high
-                if color_blue > colors_blue_perc_low:
+                    color_blue = colors_blue_perc_low
+                if color_blue > colors_blue_perc_high:
                     color_blue = colors_blue_perc_high
 
 
@@ -1335,6 +1295,12 @@ class ElevationMesh(object):
                 colors_array_lut_green_clean[color_id] = color_green = ((color_green - colors_green_perc_low) * 100 / (colors_green_perc_high - colors_green_perc_low)) / 100
                 colors_array_lut_blue_clean[color_id] = ((color_blue - colors_blue_perc_low) * 100 / (colors_blue_perc_high - colors_blue_perc_low)) / 100
 
+                ## spread color table
+                #colors_array_lut_red_clean[color_id] = ((color_red * 100.0) / colors_red_perc_high) / 100.0
+                #colors_array_lut_green_clean[color_id] = ((color_green * 100.0) / colors_green_perc_high) / 100.0
+                #colors_array_lut_blue_clean[color_id] = ((color_blue * 100.0) / colors_blue_perc_high) / 100.0
+
+
             else:
 
                 colors_array_lut_red_clean[color_id] = ((color_red * 100.0) / 255.0) / 100.0
@@ -1342,9 +1308,10 @@ class ElevationMesh(object):
                 colors_array_lut_blue_clean[color_id] = ((color_blue * 100.0) / 255.0) / 100.0
 
 
+        #print(unique_nodecoords_cnt*3)
+        #sys.exit()
 
-
-        nodecoords_list = nodecoords_array.tolist()
+        nodecoords_list = nodecoords_array[0:unique_nodecoords_cnt*3].tolist()
         nodecoords_list_int = map(int, nodecoords_list)
 
         nodecoords_list_int_triples = []      
@@ -1365,7 +1332,7 @@ class ElevationMesh(object):
                 j = i+1
                 if j == len(nodecoord_triple):
                     j = 0
-        
+    
                 normal[0] += (coords_array_lut_y[nodecoord_triple[i]] - coords_array_lut_y[nodecoord_triple[j]]) * (coords_array_lut_z[nodecoord_triple[i]] + coords_array_lut_z[nodecoord_triple[j]])
                 normal[1] += (coords_array_lut_z[nodecoord_triple[i]] - coords_array_lut_z[nodecoord_triple[j]]) * (coords_array_lut_x[nodecoord_triple[i]] + coords_array_lut_x[nodecoord_triple[j]])
                 normal[2] += (coords_array_lut_x[nodecoord_triple[i]] - coords_array_lut_x[nodecoord_triple[j]]) * (coords_array_lut_y[nodecoord_triple[i]] + coords_array_lut_y[nodecoord_triple[j]])
@@ -1405,13 +1372,13 @@ class ElevationMesh(object):
         nodecolors_array_clean = nodecolors_array[numpy.logical_not(numpy.isnan(nodecolors_array))]
         #nodenormals_array_clean = nodenormals_array[numpy.logical_not(numpy.isnan(nodenormals_array))]
 
+
     
-        
-        
-        
+    
+    
         elevation_minmax = [0,1]
         triangles_z_min_total, triangles_z_max_total = elevation_minmax
-        
+    
         aoi3d = [triangles_x_min_total, triangles_x_max_total, triangles_y_min_total, triangles_y_max_total, triangles_z_min_total, triangles_z_max_total]
         center_scale_coords=True
 
@@ -1431,14 +1398,14 @@ class ElevationMesh(object):
 
         if mesh_format.lower() == 'x3d':
             self.write_x3d(nodecoords_array_clean, coords_arrays_lut_clean_trans, nodecolors_array_clean, colors_arrays_lut_clean, normals_arrays_lut_clean, out_mesh, out_mesh_filename, aoi3d, center_scale_coords, indexed_colors, scale_xy, z_exaggeration, projection, centering, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_boundaries_total)
-        
+    
         if mesh_format.lower() == 'py':
             self.write_python_matplotlib(nodecoords_array_clean, coords_arrays_lut_clean_trans, nodecolors_array_clean, colors_arrays_lut_clean, normals_arrays_lut_clean, out_mesh, out_mesh_filename, aoi3d, center_scale_coords, indexed_colors, scale_xy, z_exaggeration, projection, centering, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_boundaries_total)
 
         if mesh_format.lower() == 'vtu':
             self.write_vtu(nodecoords_array_clean, coords_arrays_lut_clean_trans, nodecolors_array_clean, colors_arrays_lut_clean, normals_arrays_lut_clean, out_mesh, out_mesh_filename, aoi3d, center_scale_coords, indexed_colors, scale_xy, z_exaggeration, projection, centering, in_boundaries_extent, in_boundaries_spatialref, in_dem_stats_minmax, out_triangles_minmax_boundaries_total)
 
-        
+    
         out_mesh.close()
 
     

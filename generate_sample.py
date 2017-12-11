@@ -56,14 +56,3 @@ elevation = mesh.ElevationMesh()
 #elevation.generate_mesh( dem=srtm3, orthophoto=bluemarble, boundaries=osm, 
 #                        mesh_prefix='pottenstein_srtm3', mesh_format='x3d', centering = False, projection='orig', scale_xy=1.0, z_exaggeration=1.0, indexed_colors=False)
 
-
-
-osm_32632 = os.path.join('.', '..', '..', 'data', 'highresdata', 'osm_2017_pottenstein_32632.shp')
-s2_32632 = os.path.join('.', '..', '..', 'data', 'highresdata', 'sentinel2a_2017_pottenstein_32632.tif')
-srtm1arcsec_32632 = os.path.join('.', '..', '..', 'data', 'highresdata', 'srtm1arcsec_2014_pottenstein_32632.tif')
-
-
-
-## VTK
-elevation.generate_mesh( dem=srtm1arcsec_32632, orthophoto=s2_32632, boundaries=osm_32632, 
-                         mesh_prefix='pottenstein_srtm1arc', mesh_format='vtu', centering=False, projection='orig', scale_xy=1.0, z_exaggeration=1.0, indexed_colors=False, orthophoto_bitdepth=16)

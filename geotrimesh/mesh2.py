@@ -129,7 +129,7 @@ class ElevationMesh(object):
     def write_vtu(self, x_grid, y_grid, z_grid, red_grid, green_grid, blue_grid, triangles):
 
 
-        with open('out_mesh.vtu', 'w') as out_mesh:     
+        with open(os.path.join('out','out_mesh.vtu'), 'w') as out_mesh:     
     
             out_mesh.write('<VTKFile type="UnstructuredGrid" version="1.0" byte_order="LittleEndian" header_type="UInt64">' + '\n')
             out_mesh.write('  <UnstructuredGrid>' + '\n')

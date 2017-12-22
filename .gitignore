@@ -15,6 +15,7 @@ mesh_sk.py
 sync_to_vserver.sh
 generate_tocomee.py
 generate_sample_tandem.py
+prepare_southdakota_srtm1arc_s2.sh
 setup.cfg
 setup.py
 generate_sample_srtm1.py

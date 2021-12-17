@@ -33,7 +33,6 @@ def read_dem(filepath):
     dem_ydist = dem_ymax - dem_ymin
     dem_xdist = dem_xmax - dem_xmin
 
-    #dem_tmp_array = np.copy(np.flipud(dem_tmp_array))
     dem_tmp_nodata_range_external = [-9999, 9999]
 
     print(dem_tmp_rows, dem_tmp_cols)
@@ -50,7 +49,6 @@ def read_dem(filepath):
 
 
         try:
-            #print(dem_intermed_array.shape)
 
             dem_tmp_array_valmin = np.nanmin(dem_intermed_array[dem_intermed_array != dem_tmp_nodata])
             dem_tmp_array_valmax = np.nanmax(dem_intermed_array[dem_intermed_array != dem_tmp_nodata])
@@ -74,7 +72,7 @@ def read_dem(filepath):
 
 
 
-def generate_terrain(clippoly_filepath, dem_dirpath, dem_prefix, dem_tilex, dem_tiley, zmean_total):
+def generate_terrain(clippoly_filepath, dem_dirpath, dem_prefix, dem_tilex, dem_tiley, zmean_total, polygon_extrude_height_down=5000, polygon_extrude_height_up=0):
 
 
     dem_filepath = os.path.join(dem_dirpath, '_'.join([dem_prefix, dem_tiley, dem_tilex]) + ".tif")
@@ -82,7 +80,6 @@ def generate_terrain(clippoly_filepath, dem_dirpath, dem_prefix, dem_tilex, dem_
     print("dem_filepath", dem_filepath, clippoly_filepath, dem_dirpath, dem_prefix, dem_tilex, dem_tiley)
 
     polygon_extrude_height = 10000.0
-    polyhedron_extrude_height = 100.0
 
 
     clippoly_driver = ogr.GetDriverByName("ESRI Shapefile")
@@ -106,9 +103,9 @@ def generate_terrain(clippoly_filepath, dem_dirpath, dem_prefix, dem_tilex, dem_
 
     dem_array, dem_cols, dem_rows, dem_xmin, dem_ymax, dem_xres, dem_yres, dem_xdist, dem_ydist = read_dem(dem_filepath)
 
-    print("nanmin", np.nanmin(dem_array))
+    print("nanmin orig", np.nanmin(dem_array))
     dem_array = np.copy(dem_array-zmean_total)
-    print("nanmin", np.nanmin(dem_array))
+    print("nanmin updated", np.nanmin(dem_array))
 
 
     if True:
@@ -124,7 +121,6 @@ def generate_terrain(clippoly_filepath, dem_dirpath, dem_prefix, dem_tilex, dem_
             polyhedron_faces_array = np.zeros((dem_rows,dem_cols,16,3), dtype=np.int32)
             polyhedron_faces_clean_array = np.zeros((dem_rows,dem_cols,16,3), dtype=np.int32)
             polyhedron_points_floor_array = np.zeros((dem_rows*dem_cols,3), dtype=np.float32)
-            #polyhedron_points_ceil_array = np.zeros((dem_rows*dem_cols,3), dtype=np.float32)
 
             z_scale = 1.0
             cnt = 0
@@ -135,24 +131,13 @@ def generate_terrain(clippoly_filepath, dem_dirpath, dem_prefix, dem_tilex, dem_
             dem_y_max = None
 
 
-            #for i in range(dem_rows,-1,-1):
             for i in range(0,dem_rows):
 
 
                 for j in range(0,dem_cols):
 
-
-
-                    #i0_coord = (dem_ymax - ((dem_yres*-1) * i) - (0.5 * (dem_yres*-1))) - dem_ydist
-                    #j0_coord = dem_xmin + (dem_xres * j) + (0.5 * dem_xres)
-
-
                     i0_coord = dem_ymax - (dem_yres * i) #- dem_ydist #- (0.5 * (dem_yres*-1)))
                     j0_coord = dem_xmin + (dem_xres * j) #+ (0.5 * dem_xres)
-
-
-
-                    #print(i,j,i0_coord,j0_coord)
 
                     z_a = (dem_array[i][j] * z_scale) #- zmean_total
 
@@ -161,8 +146,6 @@ def generate_terrain(clippoly_filepath, dem_dirpath, dem_prefix, dem_tilex, dem_
                     dem_y = i0_coord
 
                     polyhedron_points_floor_array[(i*dem_cols)+j][:] = np.array([dem_x - clippoly_layer_extent_xcent, dem_y  - clippoly_layer_extent_ycent, z_a])
-                    #polyhedron_points_floor_array[cnt][:] = np.array([j0_coord - clippoly_layer_extent_xcent, i0_coord - clippoly_layer_extent_ycent, z_a])
-
 
 
                     if not dem_x_min or dem_x < dem_x_min:
@@ -175,8 +158,6 @@ def generate_terrain(clippoly_filepath, dem_dirpath, dem_prefix, dem_tilex, dem_
                     if not dem_y_max or dem_y > dem_y_max:
                         dem_y_max = dem_y
 
-
-                    #print(dem_rows*dem_cols, cnt, (i*dem_rows)+j, dem_rows, dem_cols, i, j, z_a)
 
 
                     if i<dem_rows-1 and j < dem_cols-1:
@@ -297,7 +278,6 @@ def generate_terrain(clippoly_filepath, dem_dirpath, dem_prefix, dem_tilex, dem_
               polyhedron_points_floor_array[polyhedron_point_id][1], 
               polyhedron_points_floor_array[polyhedron_point_id][2]-(l*10.0)]
  
-            #print(polyhedron_point)
             polyhedron_points.append(polyhedron_point)
 
         
@@ -317,8 +297,6 @@ def generate_terrain(clippoly_filepath, dem_dirpath, dem_prefix, dem_tilex, dem_
     c.append('module dem() {')
     c.append('  polyhedron(points={}, faces={});'.format(polyhedron_points, polyhedron_faces_clean))
     c.append('}')
-
-    #c.append('dem();')
 
 
 
@@ -369,7 +347,7 @@ def generate_terrain(clippoly_filepath, dem_dirpath, dem_prefix, dem_tilex, dem_
 
 
                 c.append('intersection() {')
-                c.append('translate([0,0,-5000]) linear_extrude(height={}) polygon({},{});'.format(polygon_extrude_height, polygon_points, polygon_paths))
+                c.append('translate([0,0,{}]) linear_extrude(height={}) polygon({},{});'.format(abs(polygon_extrude_height_down)*-1, polygon_extrude_height_down+polygon_extrude_height_up, polygon_points, polygon_paths))
                 c.append('dem();')
                 c.append('}')
 
@@ -396,9 +374,6 @@ def generate_terrain(clippoly_filepath, dem_dirpath, dem_prefix, dem_tilex, dem_
                 
                     polygon_path.append(point_cnt)
                     polygon_points.append([geom_bound_point_x - clippoly_layer_extent_xcent, geom_bound_point_y - clippoly_layer_extent_ycent])
-                    #polygon_points.append([0, 0])
-                    #print(geom_bound_point_x - clippoly_layer_extent_xcent, geom_bound_point_y - clippoly_layer_extent_ycent)
-                    #print(clippoly_layer_extent_xcent, clippoly_layer_extent_ycent)
                     point_cnt +=1
 
 
@@ -406,7 +381,7 @@ def generate_terrain(clippoly_filepath, dem_dirpath, dem_prefix, dem_tilex, dem_
 
 
             c.append('intersection() {')
-            c.append('translate([0,0,-5000]) linear_extrude(height={}) polygon({},{});'.format(polygon_extrude_height, polygon_points, polygon_paths))
+            c.append('translate([0,0,{}]) linear_extrude(height={}) polygon({},{});'.format(abs(polygon_extrude_height_down)*-1, polygon_extrude_height_down+polygon_extrude_height_up, polygon_points, polygon_paths))
             c.append('dem();')
             c.append('}')
 
@@ -433,7 +408,6 @@ def generate_terrain(clippoly_filepath, dem_dirpath, dem_prefix, dem_tilex, dem_
 
 
 scad_filename_base = 'test'
-proc_target_os = 'win'
 
 openscad_bin_filepath = 'openscad'
 scad_dirpath = os.path.join(os.sep, 'mnt', 'c', 'Users', 'mic', 'dev')
@@ -452,6 +426,8 @@ parser.add_argument('--dem_tilex', action='store', type=str, required=True)
 parser.add_argument('--dem_tiley', action='store', type=str, required=True)
 parser.add_argument('--zmin', action='store', type=str, required=False)
 parser.add_argument('--zmax', action='store', type=str, required=False)
+parser.add_argument('--dem_extrude_up', action='store', type=str, required=False)
+parser.add_argument('--dem_extrude_down', action='store', type=str, required=False)
 parser.add_argument('--clippoly', action='store', type=str, required=True)
 parser.add_argument('--outdir', action='store', type=str, required=True)
 
@@ -463,9 +439,10 @@ dem_tilex = args.dem_tilex
 dem_tiley = args.dem_tiley
 clippoly_filepath = args.clippoly
 proc_dirpath = args.outdir
-#sys.exit()
-#dem_dirpath, dem_filename = os.path.split(dem_filepath)
-#dem_filename_base = dem_filename.split('.')[0]
+polygon_extrude_height_down = args.dem_extrude_down
+polygon_extrude_height_up = args.dem_extrude_up
+
+
 scad_dirpath = args.outdir
 
 scad_filename_base = "_".join([dem_prefix, dem_tiley, dem_tilex])
@@ -479,42 +456,20 @@ except:
 command_lines = []
 
 
-#if not (os.path.isfile(os.path.join(scad_dirpath, scad_filename_base + '.bat')) or os.path.isfile(os.path.join(scad_dirpath, scad_filename_base + '.sh'))):
-if True:
 
-    terrain_command_lines = generate_terrain(clippoly_filepath, dem_dirpath, dem_prefix, dem_tilex, dem_tiley, zmean_total)
-    command_lines += terrain_command_lines
+terrain_command_lines = generate_terrain(clippoly_filepath, dem_dirpath, dem_prefix, dem_tilex, dem_tiley, zmean_total, polygon_extrude_height_down, polygon_extrude_height_up)
+command_lines += terrain_command_lines
 
 
 
-    with open(os.path.join(scad_dirpath, scad_filename_base + '.scad'), 'w') as scad_file:
-        for command_line in command_lines:
-            scad_file.write(command_line + '\n')
+with open(os.path.join(scad_dirpath, scad_filename_base + '.scad'), 'w') as scad_file:
+    for command_line in command_lines:
+        scad_file.write(command_line + '\n')
 
 
+subprocess_bin = openscad_bin_filepath
+subprocess_commands = [subprocess_bin, '-o', os.path.join(proc_dirpath, scad_filename_base + '.stl'), os.path.join(scad_dirpath, scad_filename_base + '.scad')]
+output = subprocess.check_output(subprocess_commands, shell=False)
 
-    if not proc_target_os == 'win':
-
-        subprocess_bin = openscad_bin_filepath
-        subprocess_commands = [subprocess_bin, '-o', os.path.join(proc_dirpath, scad_filename_base + '.stl'), os.path.join(scad_dirpath, scad_filename_base + '.scad')]
-        output = subprocess.check_output(subprocess_commands, shell=False)
-
-    else:
-
-        openscad_win_bin_filepath = '\\'.join(['C:', '"Program Files"', 'OpenSCAD', 'openscad.com'])
-        openscad_linux_bin_filepath = os.path.join(os.sep, 'home', 'mic', 'prog', 'OpenSCAD-2019.05-x86_64', 'squashfs-root', 'usr', 'bin', 'openscad')
-
-        scad_win_dirpath = '\\'.join(['C:', 'Users', 'mic', 'dev'])
-        proc_win_dirpath = '\\'.join(['C:', 'Users', 'mic', 'dev'])
-
-        subprocess_args = ['-o', scad_filename_base + '.stl', scad_filename_base + '.scad']
-        subprocess_win_command = [openscad_win_bin_filepath] + subprocess_args
-        subprocess_linux_command = [openscad_linux_bin_filepath] + subprocess_args
-
-        with open(os.path.join(scad_dirpath, scad_filename_base + '.bat'), 'w') as batch_file:
-            batch_file.write(' '.join(subprocess_win_command))
-
-        with open(os.path.join(scad_dirpath, scad_filename_base + '.sh'), 'w') as shell_file:
-            shell_file.write(' '.join(subprocess_linux_command))
 
 

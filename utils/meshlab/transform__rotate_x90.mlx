@@ -1,0 +1,14 @@
+<!DOCTYPE FilterScript>
+<FilterScript>
+ <filter name="Transform: Rotate">
+  <Param value="0" enum_cardinality="4" enum_val2="Z axis" type="RichEnum" description="Rotation on:" tooltip="Choose a method" enum_val1="Y axis" enum_val0="X axis" enum_val3="custom axis" name="rotAxis"/>
+  <Param value="0" enum_cardinality="3" enum_val2="custom point" type="RichEnum" description="Center of rotation:" tooltip="Choose a method" enum_val1="barycenter" enum_val0="origin" name="rotCenter"/>
+  <Param value="90" min="-360" type="RichDynamicFloat" description="Rotation Angle" tooltip="Angle of rotation (in &lt;b>degree&lt;/b>). If snapping is enabled this value is rounded according to the snap value" max="360" name="angle"/>
+  <Param x="0" type="RichPoint3f" description="Custom axis" tooltip="This rotation axis is used only if the 'custom axis' option is chosen." y="0" z="0" name="customAxis"/>
+  <Param x="0" type="RichPoint3f" description="Custom center" tooltip="This rotation center is used only if the 'custom point' option is chosen." y="0" z="0" name="customCenter"/>
+  <Param value="false" type="RichBool" description="Snap angle" tooltip="If selected, before starting the filter will remove any unreferenced vertex (for which curvature values are not defined)" name="snapFlag"/>
+  <Param value="30" type="RichFloat" description="Snapping Value" tooltip="This value is used to snap the rotation angle (i.e. if the snapping value is 30, 227 becomes 210)." name="snapAngle"/>
+  <Param value="true" type="RichBool" description="Freeze Matrix" tooltip="The transformation is explicitly applied, and the vertex coordinates are actually changed" name="Freeze"/>
+  <Param value="false" type="RichBool" description="Apply to all visible Layers" tooltip="If selected the filter will be applied to all visible mesh layers" name="allLayers"/>
+ </filter>
+</FilterScript>

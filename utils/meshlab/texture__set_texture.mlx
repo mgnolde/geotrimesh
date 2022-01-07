@@ -1,0 +1,15 @@
+<!DOCTYPE FilterScript>
+<FilterScript>
+ <filter name="Set Texture">
+  <Param name="textName" type="RichString" tooltip="If the file exists it will be associated to the mesh else a dummy one will be created" value="dtm_warp_2_2_mold.png" description="Texture file"/>
+  <Param name="textDim" type="RichInt" tooltip="If the named texture doesn't exists the dummy one will be squared with this size" value="1024" description="Texture Dimension (px)"/>
+ </filter>
+ <filter name="Set Texture">
+  <Param name="textName" type="RichString" tooltip="If the file exists it will be associated to the mesh else a dummy one will be created" value="ortho_warp_2_2.png" description="Texture file"/>
+  <Param name="textDim" type="RichInt" tooltip="If the named texture doesn't exists the dummy one will be squared with this size" value="1024" description="Texture Dimension (px)"/>
+ </filter>
+ <filter name="Set Texture">
+  <Param name="textName" type="RichString" tooltip="If the file exists it will be associated to the mesh else a dummy one will be created" value="E:\simenv\models\zki\ortho_warp_2_2.png" description="Texture file"/>
+  <Param name="textDim" type="RichInt" tooltip="If the named texture doesn't exists the dummy one will be squared with this size" value="1024" description="Texture Dimension (px)"/>
+ </filter>
+</FilterScript>

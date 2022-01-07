@@ -1,0 +1,9 @@
+<!DOCTYPE FilterScript>
+<FilterScript>
+ <filter name="Parametrization: Trivial Per-Triangle">
+  <Param description="Quads per line" name="sidedim" type="RichInt" tooltip="Indicates how many triangles have to be put on each line (every quad contains two triangles)&#xa;Leave 0 for automatic calculation" value="0"/>
+  <Param description="Texture Dimension (px)" name="textdim" type="RichInt" tooltip="Gives an indication on how big the texture is" value="1024"/>
+  <Param description="Inter-Triangle border (px)" name="border" type="RichInt" tooltip="Specifies how many pixels to be left between triangles in parametrization domain" value="2"/>
+  <Param enum_val1="Space-optimizing" description="Method" name="method" enum_cardinality="2" type="RichEnum" tooltip="Choose space optimizing to map smaller faces into smaller triangles in parametrizazion domain" value="1" enum_val0="Basic"/>
+ </filter>
+</FilterScript>

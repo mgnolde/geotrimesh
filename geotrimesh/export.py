@@ -47,6 +47,9 @@ def read_dem(filepath):
 
         dem_intermed_array = dem_tmp_array
 
+
+
+
         try:
 
             dem_tmp_array_valmin = np.nanmin(
@@ -64,6 +67,7 @@ def read_dem(filepath):
             sys.exit()
 
         dem_array = dem_intermed_array
+        zmean_total = np.nanmean(dem_array[dem_array>-9999])
 
         dem_rows, dem_cols = dem_array.shape
 
@@ -77,6 +81,7 @@ def read_dem(filepath):
         dem_yres,
         dem_xdist,
         dem_ydist,
+        zmean_total
     )
 
 
@@ -84,10 +89,16 @@ def generate_terrain(
     clippoly_filepath,
     dem_filepath,
     zmean_total,
+    dem_extrude_height_down,
+    dem_extrude_height_up,
     polygon_extrude_height_down,
     polygon_extrude_height_up,
     bbox_mode,
 ):
+
+    #print(polygon_extrude_height_down)
+    #print(polygon_extrude_height_up)
+    #sys.exit()
 
     clippoly_driver = ogr.GetDriverByName("GPKG")
     clippoly_datasource = clippoly_driver.Open(clippoly_filepath, 0)
@@ -118,6 +129,7 @@ def generate_terrain(
         dem_yres,
         dem_xdist,
         dem_ydist,
+        zmean_total
     ) = read_dem(dem_filepath)
 
     print("nanmin orig", np.nanmin(dem_array))
@@ -125,7 +137,7 @@ def generate_terrain(
     print("nanmin updated", np.nanmin(dem_array))
 
     if bbox_mode:
-        dem_array = np.nanmean(dem_array)
+        dem_array[:,:] = np.nanmean(dem_array)
 
     if True:
 
@@ -155,7 +167,7 @@ def generate_terrain(
 
             for i in range(0, dem_rows):
 
-                print("[", i, "/", dem_rows, "]")
+                #print("[", i, "/", dem_rows, "]")
 
                 for j in range(0, dem_cols):
 
@@ -261,7 +273,7 @@ def generate_terrain(
 
                     cnt += 1
 
-    print(polyhedron_points_floor_array[-1])
+    #print(polyhedron_points_floor_array[-1])
 
     polyhedron_faces_clean = []
 
@@ -269,7 +281,7 @@ def generate_terrain(
 
         for j in range(0, dem_cols):
 
-            print("[", i, "/", dem_rows, "]", "[", j, "/", dem_cols, "]")
+            #print("[", i, "/", dem_rows, "]", "[", j, "/", dem_cols, "]")
 
             for polyhedron_face_id in range(0, 16):
 
@@ -401,10 +413,16 @@ def generate_terrain(
     for l in range(1, -1, -1):
         for polyhedron_point_id in range(0, polyhedron_points_floor_array.shape[0]):
 
+            if l == 1:
+                z_offset = dem_extrude_height_up
+            if l == 0:
+                z_offset = abs(dem_extrude_height_down) * -1
+
+
             polyhedron_point = [
                 polyhedron_points_floor_array[polyhedron_point_id][0],
                 polyhedron_points_floor_array[polyhedron_point_id][1],
-                polyhedron_points_floor_array[polyhedron_point_id][2] - (l * 10.0),
+                polyhedron_points_floor_array[polyhedron_point_id][2] - z_offset,
             ]
 
             polyhedron_points.append(polyhedron_point)
@@ -431,6 +449,7 @@ def generate_terrain(
         geom_subgeomcount = geom.GetGeometryCount()
 
         if geom_name.lower() == "multipolygon":
+            print(feat_id, geom_name.lower())
 
             ## iterate over sub polygons
             for sub_id in range(0, geom.GetGeometryCount()):
@@ -473,7 +492,7 @@ def generate_terrain(
                 c.append(
                     "translate([0,0,{}]) linear_extrude(height={}) polygon({},{});".format(
                         abs(polygon_extrude_height_down) * -1,
-                        polygon_extrude_height_down + polygon_extrude_height_up,
+                        abs(polygon_extrude_height_down) + abs(polygon_extrude_height_up),
                         polygon_points,
                         polygon_paths,
                     )
@@ -481,8 +500,10 @@ def generate_terrain(
                 c.append("dem();")
                 c.append("}")
 
+
         elif geom_name.lower() == "polygon":
 
+            print(geom_name.lower())
             polygon_points = []
             polygon_paths = []
             point_cnt = 0
@@ -513,13 +534,14 @@ def generate_terrain(
             c.append(
                 "translate([0,0,{}]) linear_extrude(height={}) polygon({},{});".format(
                     abs(polygon_extrude_height_down) * -1,
-                    polygon_extrude_height_down + polygon_extrude_height_up,
+                    abs(polygon_extrude_height_down) + abs(polygon_extrude_height_up),
                     polygon_points,
                     polygon_paths,
                 )
             )
             c.append("dem();")
             c.append("}")
+
 
     from operator import itemgetter
 
@@ -533,13 +555,15 @@ openscad_bin_filepath = "openscad"
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--dem", action="store", type=str, required=True)
-parser.add_argument("--zmin", action="store", type=str, required=False)
-parser.add_argument("--zmax", action="store", type=str, required=False)
-parser.add_argument("--dem_extrude_down", action="store", type=str, required=False)
-parser.add_argument("--dem_extrude_up", action="store", type=str, required=False)
+#parser.add_argument("--zmin", action="store", type=str, required=False)
+#parser.add_argument("--zmax", action="store", type=str, required=False)
+#parser.add_argument("--polygon_extrude_down", action="store", type=str, required=False)
+#parser.add_argument("--polygon_extrude_up", action="store", type=str, required=False)
+#parser.add_argument("--dem_extrude_down", action="store", type=str, required=False)
+#parser.add_argument("--dem_extrude_up", action="store", type=str, required=False)
 parser.add_argument("--clippoly", action="store", type=str, required=True)
 parser.add_argument("--out", action="store", type=str, required=True)
-parser.add_argument("-b", action="store_true")
+#parser.add_argument("-b", action="store_true")
 
 args = parser.parse_args()
 
@@ -547,11 +571,18 @@ dem_filepath = args.dem
 clippoly_filepath = args.clippoly
 out_filepath = args.out
 
-polygon_extrude_height_down = (
-    float(args.dem_extrude_down) if args.dem_extrude_down else 500
-)
-polygon_extrude_height_up = float(args.dem_extrude_up) if args.dem_extrude_up else 0
-bbox_mode = False if not args.b else True
+polygon_extrude_height_down = 500
+polygon_extrude_height_up = 500
+dem_extrude_height_down = 10
+dem_extrude_height_up = 10
+
+
+
+bbox_mode = False
+
+
+
+
 
 print(clippoly_filepath)
 
@@ -569,6 +600,8 @@ terrain_command_lines = generate_terrain(
     clippoly_filepath,
     dem_filepath,
     zmean_total,
+    dem_extrude_height_down,
+    dem_extrude_height_up,
     polygon_extrude_height_down,
     polygon_extrude_height_up,
     bbox_mode,

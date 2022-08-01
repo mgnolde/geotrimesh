@@ -1,8 +1,5 @@
 Generate sceneries from georeferenced 2D and 3D sources.
 
-![zurich](docs/zurich_1_0.png)
-![zurich](docs/tile_1_0_edges_2.png)
-
 ```python
 from geotrimesh import GeoSceneSet
 
@@ -34,3 +31,6 @@ zurich.ortho = GeoSceneSet.Ortho(
     tiles=tilingscheme.tiles[2:3],
     )
 ```
+
+![zurich](docs/zurich_1_0.png)
+![zurich](docs/tile_1_0_edges_2.png)

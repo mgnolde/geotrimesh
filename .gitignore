@@ -1,3 +1,4 @@
 *.swp
 *.stl
 *.scad
+__pycache__/

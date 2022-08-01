@@ -1,0 +1,221 @@
+{
+    "asset": {
+        "version": "2.0",
+        "generator": "Open Asset Import Library (assimp v5.0.0)"
+    },
+    "accessors": [
+        {
+            "bufferView": 0,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 148,
+            "type": "VEC3",
+            "max": [
+                2683311.25,
+                1247817.25,
+                405.3210144042969
+            ],
+            "min": [
+                2683260.25,
+                1247766.75,
+                405.3210144042969
+            ]
+        },
+        {
+            "bufferView": 1,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 148,
+            "type": "VEC4",
+            "max": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "min": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "bufferView": 2,
+            "byteOffset": 0,
+            "componentType": 5125,
+            "count": 156,
+            "type": "SCALAR",
+            "max": [
+                74.0
+            ],
+            "min": [
+                0.0
+            ]
+        },
+        {
+            "bufferView": 3,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 9802,
+            "type": "VEC3",
+            "max": [
+                2683311.75,
+                1247968.875,
+                441.3810119628906
+            ],
+            "min": [
+                2683090.75,
+                1247705.25,
+                404.5150146484375
+            ]
+        },
+        {
+            "bufferView": 4,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 9802,
+            "type": "VEC4",
+            "max": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "min": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "bufferView": 5,
+            "byteOffset": 0,
+            "componentType": 5125,
+            "count": 38055,
+            "type": "SCALAR",
+            "max": [
+                5811.0
+            ],
+            "min": [
+                0.0
+            ]
+        }
+    ],
+    "buffers": [
+        {
+            "byteLength": 431444,
+            "uri": "data.bin"
+        }
+    ],
+    "bufferViews": [
+        {
+            "buffer": 0,
+            "byteOffset": 0,
+            "byteLength": 1776,
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 1776,
+            "byteLength": 2368,
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 4144,
+            "byteLength": 624,
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 4768,
+            "byteLength": 117624,
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 122392,
+            "byteLength": 156832,
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 279224,
+            "byteLength": 152220,
+            "target": 34963
+        }
+    ],
+    "materials": [
+        {
+            "name": "DefaultMaterial",
+            "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                    0.8999999761581421,
+                    0.8999999761581421,
+                    0.8999999761581421,
+                    1.0
+                ],
+                "metallicFactor": 0.0
+            }
+        }
+    ],
+    "meshes": [
+        {
+            "name": "geoz_lod2_geb3d",
+            "primitives": [
+                {
+                    "mode": 1,
+                    "material": 0,
+                    "indices": 2,
+                    "attributes": {
+                        "POSITION": 0,
+                        "COLOR_0": 1
+                    }
+                },
+                {
+                    "mode": 4,
+                    "material": 0,
+                    "indices": 5,
+                    "attributes": {
+                        "POSITION": 3,
+                        "COLOR_0": 4
+                    }
+                }
+            ]
+        }
+    ],
+    "nodes": [
+        {
+            "name": "<DXF_ROOT>",
+            "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -1.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0
+            ],
+            "mesh": 0
+        }
+    ],
+    "scenes": [
+        {
+            "nodes": [
+                0
+            ]
+        }
+    ],
+    "scene": 0
+}

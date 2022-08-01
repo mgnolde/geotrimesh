@@ -1,3 +1,5 @@
-Command line converter from GIS data (Elevation model, vector boundaries, orthophoto) to texturized mesh models. OpenSCAD is used for 3D geometric operations.
+Generates sceneries from georeferenced 2D and 3D sources.
 
-![pottenstein](pottenstein.png)
+![pottenstein](docs/pottenstein.png)
+![zurich](docs/zurich_1_0.png)
+![zurich](docs/tile_1_0_edges_2.png)

@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "geotrimesh"
+version = "0.9.0"
+readme = "README.md"
+repository = "https://github.com/mgnolde/geotrimesh"
+license="Apache 2.0"
+description = "Generate sceneries from georeferenced 2D and 3D sources."
+authors = ["Michael Nolde <mgnolde@gmail.com>"]
+
+[tool.poetry.dependencies]
+geopandas = "^0.10.2"
+trimesh = "^3.11.2"
+open3d = "^0.13.0"
+vtk = "^9.1.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

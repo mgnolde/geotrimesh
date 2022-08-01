@@ -20,7 +20,7 @@ ortho_filepaths = [Path(data_dirpath, "2507_clip.tif")]
 trees_filepaths = []
 
 boundary = gpd.read_file(boundary_filepath).dissolve().explode(index_parts=True)
-out_dirpath = Path(os.getcwd())
+out_dirpath = Path(tempfile.gettempdir())
 
 zurich = GeoSceneSet()
 

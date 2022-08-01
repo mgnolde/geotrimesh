@@ -74,7 +74,7 @@ class GeoSceneSet:
                 (float(boundary.bounds.minx) + float(boundary.bounds.maxx)) / 2.0,
                 (float(boundary.bounds.miny) + float(boundary.bounds.maxy)) / 2.0,
             )
-            scale = (100000.0, 100000.0, 100000.0)
+            scale = (1.0, 1.0, 1.0)
 
             upper_left_aoi, res, nodata = self.define_aoi_origin(upper_left, filepaths)
 
@@ -271,7 +271,7 @@ class GeoSceneSet:
                         (float(boundary.bounds.miny) + float(boundary.bounds.maxy))
                         / 2.0,
                     )
-                    scale = (100000.0, 100000.0, 100000.0)
+                    scale = (1.0, 1.0, 1.0)
 
                     for key in scene.geometry:
                         if type(scene.geometry[key]).__name__ == "Trimesh":
@@ -438,7 +438,7 @@ class GeoSceneSet:
                 (float(boundary.bounds.minx) + float(boundary.bounds.maxx)) / 2.0,
                 (float(boundary.bounds.miny) + float(boundary.bounds.maxy)) / 2.0,
             )
-            scale = (100000.0, 100000.0, 100000.0)
+            scale = (1.0, 1.0, 1.0)
 
             polyhedron_faces_array = np.zeros(
                 (tile.dims[0], tile.dims[1], 16, 3), dtype=np.int32
@@ -763,7 +763,7 @@ class GeoSceneSet:
             )
 
             left, bottom, right, top = tile.geom.bounds
-            scale = (100000.0, 100000.0, 100000.0)
+            scale = (1.0, 1.0, 1.0)
 
             boundary_tile = boundary.cx[left:right, bottom:top]
             polys = []
@@ -873,7 +873,7 @@ class GeoSceneSet:
             openscad_bin_filepath=Path("openscad"),
         ):
 
-            scale = (100000.0, 100000.0, 100000.0)
+            scale = (1.0, 1.0, 1.0)
 
             import logging
 
@@ -1134,7 +1134,7 @@ class GeoSceneSet:
                 0,
             )
 
-            scale = (100000.0, 100000.0, 100000.0)
+            scale = (1.0, 1.0, 1.0)
 
             features2d = []
             features3d = []

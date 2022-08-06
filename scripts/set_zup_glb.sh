@@ -1,1 +1,0 @@
-blender --background --python scripts/set_zup_glb.py -- ${1} "result_"

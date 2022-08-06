@@ -1,16 +1,16 @@
 from pathlib import Path
-import copy
-import trimesh
-import fiona
 import geopandas as gpd
 from geotrimesh import GeoSceneSet
-import sys
-import os
-import shutil
-import logging
 import tempfile
+import os
+import logging
+import argparse
 
 logging.basicConfig(level=logging.INFO)
+parser=argparse.ArgumentParser()
+parser.add_argument("out_dir", help="", nargs='?', default=Path(tempfile.gettempdir()))
+args = parser.parse_args()
+out_dirpath = args.out_dir
 
 data_dirpath = Path(os.getcwd(), "demodata")
 boundary_filepath = Path(data_dirpath, "bbox.gpkg")
@@ -20,7 +20,7 @@ ortho_filepaths = [Path(data_dirpath, "2507_clip.tif")]
 trees_filepaths = []
 
 boundary = gpd.read_file(boundary_filepath).dissolve().explode(index_parts=True)
-out_dirpath = Path(tempfile.gettempdir())
+
 
 zurich = GeoSceneSet()
 
@@ -30,7 +30,7 @@ tilingscheme.gdf.to_file(Path(out_dirpath, "tiles.gpkg"))
 zurich.terrain = GeoSceneSet.Terrain(
     out_dirpath=out_dirpath,
     filepaths=dem_filepaths, 
-    tiles=tilingscheme.tiles[2:3],
+    tiles=tilingscheme.tiles[0:3],
     boundary=boundary
     )
 
@@ -40,7 +40,7 @@ zurich.buildings = GeoSceneSet.Features("buildings",
     filepaths=buildings_filepaths,
     recombine_bodies=True,
     boundary=boundary, 
-    tiles=tilingscheme.tiles[2:3],
+    tiles=tilingscheme.tiles[0:3],
     )
 
 zurich.ortho = GeoSceneSet.Ortho(
@@ -48,5 +48,6 @@ zurich.ortho = GeoSceneSet.Ortho(
     out_dirpath=out_dirpath,
     filepaths=ortho_filepaths,
     boundary=boundary, 
-    tiles=tilingscheme.tiles[2:3],
+    tiles=tilingscheme.tiles[0:3],
+    switch_axes=True
     )

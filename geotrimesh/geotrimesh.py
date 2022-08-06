@@ -197,6 +197,7 @@ class GeoSceneSet:
             filepaths=None,
             tiles=None,
             boundary=None,
+            switch_axes=False
         ):
 
             for tile in tiles:
@@ -278,9 +279,11 @@ class GeoSceneSet:
                             mesh_orig = scene.geometry[key]
 
                             uv = []
+                            vertices_switched_axes = []
                             for vert in mesh_orig.vertices:
                                 print(vert)
                                 x_local, y_local, z_local = vert
+                                vertices_switched_axes.append((x_local, z_local, y_local))
 
                                 x = (float(x_local) / scale[0]) + center[0]
                                 y = (float(y_local) / scale[1]) + center[1]
@@ -299,8 +302,16 @@ class GeoSceneSet:
                             color_visuals = trimesh.visual.TextureVisuals(
                                 uv=uv, image=im, material=material
                             )
+
+                            switch_axes = True
+
+                            if switch_axes:
+                                vertices = vertices_switched_axes
+                            else:
+                                vertices = mesh_orig.vertices
+
                             mesh_orig_new = trimesh.Trimesh(
-                                vertices=mesh_orig.vertices,
+                                vertices=vertices,
                                 faces=mesh_orig.faces,
                                 visual=color_visuals,
                                 validate=True,
@@ -377,9 +388,9 @@ class GeoSceneSet:
 
             for tile in tiles:
 
-                self.mosaic = self.generate_terrain_mosaic(filepaths, tile)
+                self.mosaic, z_bounds = self.generate_terrain_mosaic(filepaths, tile)
                 self.mesh = self.generate_terrain_mesh(
-                    self.mosaic, boundary, tile, out_dirpath, openscad_bin_filepath
+                    self.mosaic, boundary, z_bounds, tile, out_dirpath, openscad_bin_filepath
                 )
 
                 open3d_mesh = open3d.geometry.TriangleMesh()
@@ -413,9 +424,12 @@ class GeoSceneSet:
                         )
                     )
 
+
         def generate_terrain_mosaic(self, filepaths, tile):
 
             rast = np.ones(tile.dims, dtype=np.float32) * tile.nodata
+            z_min_total = None
+            z_max_total = None
 
             for filepath in filepaths:
                 with rasterio.open(filepath) as src:
@@ -429,14 +443,24 @@ class GeoSceneSet:
 
                     rast[rast < 5000] = rast_tmp[rast < 5000]
 
-            return rast
+                    z_min = np.nanmin(rast_tmp[rast_tmp!=src.nodatavals[0]])
+                    z_max = np.nanmax(rast_tmp[rast_tmp!=src.nodatavals[0]])
 
-        def _get_polyhedron_faces(self, rast, tile, boundary):
+                    if not z_min_total or z_min < z_min_total:
+                        z_min_total = z_min
+                    if not z_max_total or z_max < z_max_total:
+                        z_max_total = z_max
+
+            return rast, (z_min_total, z_max_total)
+
+
+        def _get_polyhedron_faces(self, rast, tile, boundary, z_bounds):
 
             left, bottom, right, top = tile.geom.bounds
             center = (
                 (float(boundary.bounds.minx) + float(boundary.bounds.maxx)) / 2.0,
                 (float(boundary.bounds.miny) + float(boundary.bounds.maxy)) / 2.0,
+                (float(z_bounds[0]) + float(z_bounds[1])) / 2.0,
             )
             scale = (1.0, 1.0, 1.0)
 
@@ -473,7 +497,7 @@ class GeoSceneSet:
                     polyhedron_points_floor_array[(i * tile.dims[1]) + j][1] = (
                         dem_y - center[1]
                     ) * scale[1]
-                    polyhedron_points_floor_array[(i * tile.dims[1]) + j][2] = z_a
+                    polyhedron_points_floor_array[(i * tile.dims[1]) + j][2] = z_a - center[2]
 
                     if not dem_x_min or dem_x < dem_x_min:
                         dem_x_min = dem_x
@@ -868,6 +892,7 @@ class GeoSceneSet:
             self,
             rast=None,
             boundary=None,
+            z_bounds=None,
             tile=None,
             out_dirpath=tempfile.gettempdir(),
             openscad_bin_filepath=Path("openscad"),
@@ -883,7 +908,7 @@ class GeoSceneSet:
             dem_extrude_height_up = 0.5 * scale[2]
 
             polyhedron_faces_array, polyhedron_points_floor_array = self._get_polyhedron_faces(
-                rast, tile, boundary
+                rast, tile, boundary, z_bounds
             )
             polyhedron_faces_clean = self._get_polyhedron_faces_clean(
                 polyhedron_faces_array, polyhedron_points_floor_array, tile
@@ -1000,6 +1025,9 @@ class GeoSceneSet:
                             self.scene, include_normals=True
                         )
                     )
+
+
+
 
         def process(
             self,

@@ -27,12 +27,12 @@ zurich = GeoSceneSet()
 tilingscheme = GeoSceneSet.TilingScheme(boundary, dem_filepaths, height=256, width=256)
 tilingscheme.gdf.to_file(Path(out_dirpath, "tiles.gpkg"))
 
-zurich.terrain = GeoSceneSet.Terrain(
-    out_dirpath=out_dirpath,
-    filepaths=dem_filepaths,
-    tiles=tilingscheme.tiles[0:3],
-    boundary=boundary
-)
+#zurich.terrain = GeoSceneSet.Terrain(
+#    out_dirpath=out_dirpath,
+#    filepaths=dem_filepaths,
+#    tiles=tilingscheme.tiles[0:3],
+#    boundary=boundary
+#)
 
 zurich.buildings = GeoSceneSet.Features(
     "buildings",

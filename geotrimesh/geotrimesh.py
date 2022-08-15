@@ -337,34 +337,36 @@ class GeoSceneSet:
                                 process=True,
                             )
 
-                            trimesh.repair.fix_inversion(mesh_orig_new, multibody=True)
-                            trimesh.repair.fix_normals(mesh_orig_new, multibody=True)
+                            clean_output = False
+                            if clean_output:
+                                trimesh.repair.fix_inversion(mesh_orig_new, multibody=True)
+                                trimesh.repair.fix_normals(mesh_orig_new, multibody=True)
 
-                            open3d_mesh = open3d.geometry.TriangleMesh()
-                            open3d_mesh.vertices = open3d.utility.Vector3dVector(
-                                mesh_orig_new.vertices
-                            )
-                            open3d_mesh.triangles = open3d.utility.Vector3iVector(
-                                mesh_orig_new.faces
-                            )
+                                open3d_mesh = open3d.geometry.TriangleMesh()
+                                open3d_mesh.vertices = open3d.utility.Vector3dVector(
+                                    mesh_orig_new.vertices
+                                )
+                                open3d_mesh.triangles = open3d.utility.Vector3iVector(
+                                    mesh_orig_new.faces
+                                )
 
-                            open3d_mesh.orient_triangles()
-                            open3d_mesh.compute_triangle_normals(normalized=True)
-                            open3d_mesh.compute_vertex_normals(normalized=True)
-                            open3d_mesh.remove_degenerate_triangles()
-                            open3d_mesh.remove_duplicated_triangles()
-                            open3d_mesh.remove_duplicated_vertices()
-                            open3d_mesh.remove_unreferenced_vertices()
+                                open3d_mesh.orient_triangles()
+                                open3d_mesh.compute_triangle_normals(normalized=True)
+                                open3d_mesh.compute_vertex_normals(normalized=True)
+                                open3d_mesh.remove_degenerate_triangles()
+                                open3d_mesh.remove_duplicated_triangles()
+                                open3d_mesh.remove_duplicated_vertices()
+                                open3d_mesh.remove_unreferenced_vertices()
 
-                            mesh_orig_new2 = trimesh.Trimesh(
-                                vertices=open3d_mesh.vertices,
-                                faces=open3d_mesh.triangles,
-                                face_normals=open3d_mesh.triangle_normals,
-                                vertex_normals=open3d_mesh.vertex_normals,
-                                visual=color_visuals,
-                                validate=True,
-                                process=False,
-                            )
+                                mesh_orig_new = trimesh.Trimesh(
+                                    vertices=open3d_mesh.vertices,
+                                    faces=open3d_mesh.triangles,
+                                    face_normals=open3d_mesh.triangle_normals,
+                                    vertex_normals=open3d_mesh.vertex_normals,
+                                    visual=color_visuals,
+                                    validate=True,
+                                    process=False,
+                                )
 
                             scene_out.add_geometry(
                                 mesh_orig_new, node_name="mesh", geom_name="mesh"

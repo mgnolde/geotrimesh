@@ -11,6 +11,7 @@ from shapely.geometry import (
     MultiPolygon,
     MultiPoint,
 )
+import warnings
 import trimesh
 import copy
 import numpy as np
@@ -30,6 +31,9 @@ from PIL import Image, ImageOps
 from rasterio.transform import Affine
 import open3d
 
+logging.basicConfig(level=logging.INFO)
+warnings.filterwarnings("ignore")
+
 
 def _get_mesh_from_scene(scene):
 
@@ -39,7 +43,10 @@ def _get_mesh_from_scene(scene):
         if type(scene.geometry[key]).__name__ == "Trimesh":
             mesh_orig = scene.geometry[key]
             mesh_orig_new = trimesh.Trimesh(
-                vertices=mesh_orig.vertices, faces=mesh_orig.faces
+                vertices=mesh_orig.vertices,
+                faces=mesh_orig.faces,
+                face_normals=mesh_orig.face_normals,
+                vertex_normals=mesh_orig.vertex_normals,
             )
             meshes.append(mesh_orig_new)
 
@@ -55,6 +62,8 @@ class GeoSceneSet:
 
     class TilingScheme:
         def __init__(self, boundary, filepaths, height=None, width=None):
+
+            logging.info("Generating tiling scheme")
 
             self.id = None
             self.scheme_dims = None
@@ -74,6 +83,8 @@ class GeoSceneSet:
                 (float(boundary.bounds.minx) + float(boundary.bounds.maxx)) / 2.0,
                 (float(boundary.bounds.miny) + float(boundary.bounds.maxy)) / 2.0,
             )
+
+            # scale = (100000.0, 100000.0, 100000.0)
             scale = (1.0, 1.0, 1.0)
 
             upper_left_aoi, res, nodata = self.define_aoi_origin(upper_left, filepaths)
@@ -114,7 +125,7 @@ class GeoSceneSet:
                 tile.nodata = nodata
                 tile.geom = geom
                 tile.geom_target = geom_target
-                tile.total_bounds = None
+                tile.total_bounds = tile.geom.bounds
 
                 self.tiles.append(tile)
 
@@ -160,7 +171,7 @@ class GeoSceneSet:
                         tile.nodata = nodata
                         tile.geom = geom
                         tile.geom_target = geom_target
-                        tile.total_bounds = None
+                        tile.total_bounds = tile.geom.bounds
 
                         self.tiles.append(tile)
 
@@ -197,8 +208,10 @@ class GeoSceneSet:
             filepaths=None,
             tiles=None,
             boundary=None,
-            switch_axes=False
+            y_up=True,
         ):
+
+            logging.info("Setting texture coordinates")
 
             for tile in tiles:
                 for glb in [
@@ -232,6 +245,7 @@ class GeoSceneSet:
                     ],
                 ]:
 
+                    scene = trimesh.load(str(glb[1]))
                     mosaic, width, height = self.generate_ortho_mosaic(
                         filepaths, tile.total_bounds
                     )
@@ -262,7 +276,7 @@ class GeoSceneSet:
                         )
                     )
                     im = ImageOps.flip(im)
-                    scene = trimesh.load(str(glb[1]))
+
                     scene_out = trimesh.Scene()
 
                     meshes = []
@@ -272,18 +286,23 @@ class GeoSceneSet:
                         (float(boundary.bounds.miny) + float(boundary.bounds.maxy))
                         / 2.0,
                     )
+
+                    # scale = (100000.0, 100000.0, 100000.0)
                     scale = (1.0, 1.0, 1.0)
 
+                    vertices_nr = []
                     for key in scene.geometry:
                         if type(scene.geometry[key]).__name__ == "Trimesh":
                             mesh_orig = scene.geometry[key]
+                            vertices_nr.append(len(mesh_orig.vertices))
 
                             uv = []
                             vertices_switched_axes = []
                             for vert in mesh_orig.vertices:
-                                print(vert)
                                 x_local, y_local, z_local = vert
-                                vertices_switched_axes.append((x_local, z_local, y_local))
+                                vertices_switched_axes.append(
+                                    (x_local, z_local, y_local)
+                                )
 
                                 x = (float(x_local) / scale[0]) + center[0]
                                 y = (float(y_local) / scale[1]) + center[1]
@@ -303,16 +322,45 @@ class GeoSceneSet:
                                 uv=uv, image=im, material=material
                             )
 
-                            switch_axes = True
-
-                            if switch_axes:
-                                vertices = vertices_switched_axes
-                            else:
+                            if not y_up:
                                 vertices = mesh_orig.vertices
+                            else:
+                                vertices = vertices_switched_axes
 
                             mesh_orig_new = trimesh.Trimesh(
                                 vertices=vertices,
                                 faces=mesh_orig.faces,
+                                face_normals=mesh_orig.face_normals,
+                                vertex_normals=mesh_orig.vertex_normals,
+                                visual=color_visuals,
+                                validate=True,
+                                process=True,
+                            )
+
+                            trimesh.repair.fix_inversion(mesh_orig_new, multibody=True)
+                            trimesh.repair.fix_normals(mesh_orig_new, multibody=True)
+
+                            open3d_mesh = open3d.geometry.TriangleMesh()
+                            open3d_mesh.vertices = open3d.utility.Vector3dVector(
+                                mesh_orig_new.vertices
+                            )
+                            open3d_mesh.triangles = open3d.utility.Vector3iVector(
+                                mesh_orig_new.faces
+                            )
+
+                            open3d_mesh.orient_triangles()
+                            open3d_mesh.compute_triangle_normals(normalized=True)
+                            open3d_mesh.compute_vertex_normals(normalized=True)
+                            open3d_mesh.remove_degenerate_triangles()
+                            open3d_mesh.remove_duplicated_triangles()
+                            open3d_mesh.remove_duplicated_vertices()
+                            open3d_mesh.remove_unreferenced_vertices()
+
+                            mesh_orig_new2 = trimesh.Trimesh(
+                                vertices=open3d_mesh.vertices,
+                                faces=open3d_mesh.triangles,
+                                face_normals=open3d_mesh.triangle_normals,
+                                vertex_normals=open3d_mesh.vertex_normals,
                                 visual=color_visuals,
                                 validate=True,
                                 process=False,
@@ -386,11 +434,20 @@ class GeoSceneSet:
             openscad_bin_filepath=Path("openscad"),
         ):
 
+            logging.info("Processing Terrain")
+
             for tile in tiles:
 
-                self.mosaic, z_bounds = self.generate_terrain_mosaic(filepaths, tile)
+                self.mosaic, self.z_bounds_total = self.generate_terrain_mosaic(
+                    filepaths, tile
+                )
                 self.mesh = self.generate_terrain_mesh(
-                    self.mosaic, boundary, z_bounds, tile, out_dirpath, openscad_bin_filepath
+                    self.mosaic,
+                    boundary,
+                    self.z_bounds_total,
+                    tile,
+                    out_dirpath,
+                    openscad_bin_filepath,
                 )
 
                 open3d_mesh = open3d.geometry.TriangleMesh()
@@ -409,7 +466,6 @@ class GeoSceneSet:
 
                 self.scene = trimesh.Scene()
                 self.scene.add_geometry(self.mesh, node_name="mesh", geom_name="mesh")
-                tile.total_bounds = tile.geom.bounds
 
                 with open(
                     Path(
@@ -424,7 +480,6 @@ class GeoSceneSet:
                         )
                     )
 
-
         def generate_terrain_mosaic(self, filepaths, tile):
 
             rast = np.ones(tile.dims, dtype=np.float32) * tile.nodata
@@ -434,6 +489,9 @@ class GeoSceneSet:
             for filepath in filepaths:
                 with rasterio.open(filepath) as src:
                     left, bottom, right, top = tile.geom.bounds
+
+                    meta = src.read(1)
+
                     rast_tmp = src.read(
                         1,
                         window=from_bounds(left, bottom, right, top, src.transform),
@@ -443,16 +501,15 @@ class GeoSceneSet:
 
                     rast[rast < 5000] = rast_tmp[rast < 5000]
 
-                    z_min = np.nanmin(rast_tmp[rast_tmp!=src.nodatavals[0]])
-                    z_max = np.nanmax(rast_tmp[rast_tmp!=src.nodatavals[0]])
+                    z_min = np.nanmin(meta[meta != src.nodatavals[0]])
+                    z_max = np.nanmax(meta[meta != src.nodatavals[0]])
 
                     if not z_min_total or z_min < z_min_total:
                         z_min_total = z_min
-                    if not z_max_total or z_max < z_max_total:
+                    if not z_max_total or z_max > z_max_total:
                         z_max_total = z_max
 
             return rast, (z_min_total, z_max_total)
-
 
         def _get_polyhedron_faces(self, rast, tile, boundary, z_bounds):
 
@@ -462,7 +519,9 @@ class GeoSceneSet:
                 (float(boundary.bounds.miny) + float(boundary.bounds.maxy)) / 2.0,
                 (float(z_bounds[0]) + float(z_bounds[1])) / 2.0,
             )
+
             scale = (1.0, 1.0, 1.0)
+            # scale = (100000.0, 100000.0, 100000.0)
 
             polyhedron_faces_array = np.zeros(
                 (tile.dims[0], tile.dims[1], 16, 3), dtype=np.int32
@@ -497,7 +556,9 @@ class GeoSceneSet:
                     polyhedron_points_floor_array[(i * tile.dims[1]) + j][1] = (
                         dem_y - center[1]
                     ) * scale[1]
-                    polyhedron_points_floor_array[(i * tile.dims[1]) + j][2] = z_a - center[2]
+                    polyhedron_points_floor_array[(i * tile.dims[1]) + j][2] = (
+                        z_a - center[2]
+                    )
 
                     if not dem_x_min or dem_x < dem_x_min:
                         dem_x_min = dem_x
@@ -787,7 +848,9 @@ class GeoSceneSet:
             )
 
             left, bottom, right, top = tile.geom.bounds
+
             scale = (1.0, 1.0, 1.0)
+            # scale = (100000.0, 100000.0, 100000.0)
 
             boundary_tile = boundary.cx[left:right, bottom:top]
             polys = []
@@ -898,6 +961,7 @@ class GeoSceneSet:
             openscad_bin_filepath=Path("openscad"),
         ):
 
+            # scale = (100000.0, 100000.0, 100000.0)
             scale = (1.0, 1.0, 1.0)
 
             import logging
@@ -968,438 +1032,369 @@ class GeoSceneSet:
             simplify_factor=None,
             tiles=None,
             boundary=None,
+            offset=None,
         ):
 
-            # tiles_total_bounds = {}
-            for tile in tiles:
+            logging.info("Processing Features")
 
-                self.process(
-                    tilingscheme=tilingscheme,
-                    out_dirpath=out_dirpath,
-                    filepaths=filepaths,
-                    recombine_bodies=recombine_bodies,
-                    simplify_factor=simplify_factor,
-                    tile=tile,
-                    description=description,
-                    boundary=boundary,
+            def _get_mesh_elevation_from_xy(mesh, coord):
+
+                x_coord, y_coord = coord
+                pSource = [x_coord, y_coord, -9999999999]
+                pTarget = [x_coord, y_coord, 9999999999]
+
+                obbTree = vtk.vtkOBBTree()
+                obbTree.SetDataSet(mesh)
+                obbTree.BuildLocator()
+
+                pointsVTKintersection = vtk.vtkPoints()
+                code = obbTree.IntersectWithLine(
+                    pSource, pTarget, pointsVTKintersection, None
                 )
 
-                tile.geom.bounds
+                pointsVTKIntersectionData = pointsVTKintersection.GetData()
+                noPointsVTKIntersection = pointsVTKIntersectionData.GetNumberOfTuples()
+                pointsIntersection = []
+                for idx in range(noPointsVTKIntersection):
+                    _tup = pointsVTKIntersectionData.GetTuple3(idx)
+                    pointsIntersection.append(_tup)
 
-                tile.total_bounds = (
-                    min(
-                        self.map2d.total_bounds[0],
-                        tile.total_bounds[0]
-                        if tile.total_bounds
-                        else tile.geom.bounds[0],
-                    ),
-                    min(
-                        self.map2d.total_bounds[1],
-                        tile.total_bounds[1]
-                        if tile.total_bounds
-                        else tile.geom.bounds[1],
-                    ),
-                    max(
-                        self.map2d.total_bounds[2],
-                        tile.total_bounds[2]
-                        if tile.total_bounds
-                        else tile.geom.bounds[2],
-                    ),
-                    max(
-                        self.map2d.total_bounds[3],
-                        tile.total_bounds[3]
-                        if tile.total_bounds
-                        else tile.geom.bounds[3],
-                    ),
-                )
+                if not len(pointsIntersection) == 0:
+                    return max([pointsIntersection[0][2], pointsIntersection[1][2]])
+                else:
+                    return None
 
-                with open(
-                    Path(
-                        out_dirpath,
-                        description + "__" + "_".join(str(x) for x in tile.id) + ".glb",
-                    ),
-                    "wb",
-                ) as f:
-                    f.write(
-                        trimesh.exchange.gltf.export_glb(
-                            self.scene, include_normals=True
-                        )
+            def translate_vertices(mesh, offset):
+
+                x_offset, y_offset, z_offset = offset
+
+                vertices = mesh.vertices
+
+                vertices_translated = []
+
+                for vertex in vertices:
+                    x, y, z = vertex
+                    vertices_translated.append(
+                        [x + x_offset, y + y_offset, z + z_offset]
                     )
 
-
-
-
-        def process(
-            self,
-            tilingscheme=None,
-            out_dirpath=tempfile.gettempdir(),
-            filepaths=None,
-            recombine_bodies=False,
-            simplify_factor=None,
-            tile=None,
-            description="feat",
-            boundary=None,
-        ):
-
-            if recombine_bodies:
-
-                ## combine bodies which overlap in 2d space (xy) into common nodes
-
-                bodies_multipolygons, bodies = self._get_map2d(
-                    filepaths=filepaths, tile=tile, boundary=boundary
+                mesh_new = trimesh.Trimesh(
+                    vertices=vertices_translated,
+                    faces=mesh.faces,
+                    face_normals=mesh.face_normals,
+                    vertex_normals=mesh.vertex_normals,
                 )
 
-                map2d_unfiltered = gpd.GeoDataFrame.from_dict(
-                    {"geometry": unary_union(bodies_multipolygons)}
-                )
-                map2d_unfiltered = map2d_unfiltered.set_crs(
-                    boundary.crs, allow_override=True
-                )
+                return mesh_new
 
-                features2d, features3d = self._do_map2d_binning(
-                    tilingscheme=tilingscheme,
-                    out_dirpath=out_dirpath,
-                    tile=tile,
-                    boundary=boundary,
-                    map2d_unfiltered=map2d_unfiltered,
-                    bodies_multipolygons=bodies_multipolygons,
-                    bodies=bodies,
-                )
+            def get_stats(mesh):
 
-                if len(features2d) > 0:
-                    features2d_dict = {}
-                    features2d_dict["geometry"] = []
-                    for feature2d in features2d:
-                        features2d_dict["geometry"].append(feature2d)
+                z_min = None
+                z_max = None
+                x_min = None
+                x_max = None
+                y_min = None
+                y_max = None
 
-                    self.map2d = gpd.GeoDataFrame.from_dict(features2d_dict)
-                    self.map2d = self.map2d.set_crs(boundary.crs, allow_override=True)
+                faces = mesh.faces
+                vertices = mesh.vertices
 
-                    scene = trimesh.Scene()
-                    for node_id, node in enumerate(features3d):
-                        scene.add_geometry(
-                            node, node_name=str(node_id), geom_name=str(node_id)
-                        )
+                for face in faces:
 
-                    self.scene = scene
-                    self.mesh = _get_mesh_from_scene(self.scene)
+                    points = [
+                        [
+                            vertices[face[0]][0],
+                            vertices[face[0]][1],
+                            vertices[face[0]][2],
+                        ],
+                        [
+                            vertices[face[1]][0],
+                            vertices[face[1]][1],
+                            vertices[face[1]][2],
+                        ],
+                        [
+                            vertices[face[2]][0],
+                            vertices[face[2]][1],
+                            vertices[face[2]][2],
+                        ],
+                    ]
 
-                else:
-                    self.scene = trimesh.Scene()
-                    self.mesh = trimesh.Trimesh()
-                    self.map2d = gpd.GeoDataFrame()
+                    for point in points:
 
-            else:
+                        z_max = max(z_max, point[2]) if z_max else point[2]
 
-                scene = trimesh.Scene()
-                for filepath in filepaths:
+                        if not z_min or (z_min and point[2] < z_min):
+                            z_min = point[2]
+                            z_min_x = point[0]
+                            z_min_y = point[1]
 
-                    feature = trimesh.load(filepath)
-                    mesh = _get_mesh_from_scene(feature)
-                    for node_id, node in enumerate(mesh.geometry):
-                        if node.centroid.intersection(tile.geom):
-                            scene.add_geometry(
-                                node, node_name=str(node_id), geom_name=str(node_id)
-                            )
+                return (z_min_x, z_min_y, z_min)
 
-                self.scene = scene
-                self.mesh = _get_mesh_from_scene(self.scene)
+            def filter_faces_by_geom(mesh, geom):
 
-        def _get_map2d(self, filepaths, tile=None, boundary=None):
+                vertices = mesh.vertices
+                faces = mesh.faces
 
-            logging.info("Affiliation")
+                face_mask = []
+                for face in faces:
 
-            bodies_total = []
-            multipolygons_total = []
+                    points = [
+                        [vertices[face[0]][0], vertices[face[0]][1]],
+                        [vertices[face[1]][0], vertices[face[1]][1]],
+                        [vertices[face[2]][0], vertices[face[2]][1]],
+                    ]
 
-            for filepath in filepaths:
+                    inside = False
+                    for point in points:
 
-                feature = trimesh.load(filepath)
-                mesh = _get_mesh_from_scene(feature)
+                        p = Point(point[0], point[1])
+                        if p.intersects(geom):
+                            inside = True
 
-                mesh_components = mesh.split(only_watertight=False)
+                    face_mask.append(inside)
 
-                for body in mesh_components:
+                mesh_out = copy.deepcopy(mesh)
+                mesh_out.update_faces(face_mask)
 
-                    polygons_body = []
+                return mesh_out
 
-                    vertices = body.vertices
-                    faces = body.faces
+            def get_2d_representation(meshes, boundary):
+
+                geoms = []
+                for mesh in meshes:
+
+                    faces = mesh.faces
+                    vertices = mesh.vertices
 
                     for face in faces:
 
-                        face_poly = self._poly_from_triangle(vertices, face)
+                        points = [
+                            (vertices[face[0]][0], vertices[face[0]][1]),
+                            (vertices[face[1]][0], vertices[face[1]][1]),
+                            (vertices[face[2]][0], vertices[face[2]][1]),
+                        ]
 
-                        if face_poly and tile.geom.buffer(
-                            (tile.geom.bounds[2] - tile.geom.bounds[0]), cap_style=3
-                        ).intersects(face_poly):
-                            polygons_body.append(face_poly)
+                        poly = make_valid(MultiPoint(points).convex_hull)
+                        if poly.geom_type == "Polygon":
+                            geoms.append(poly)
 
-                    if len(polygons_body) > 0:
-                        multipolygon = MultiPolygon(polygons_body)
-                        bodies_total.append(body)
-                        multipolygons_total.append(multipolygon)
-                        logging.info(f"Body added {len(bodies_total)}")
+                gdf = gpd.GeoDataFrame.from_dict({"geometry": unary_union(geoms)})
 
-            return multipolygons_total, bodies_total
+                return gdf
 
-        def _do_map2d_binning(
-            self,
-            tilingscheme,
-            out_dirpath=None,
-            tile=None,
-            boundary=None,
-            map2d_unfiltered=None,
-            bodies_multipolygons=None,
-            bodies=None,
-            scale=(1.0, 1.0, 1.0),
-        ):
-
-            logging.info("Binning")
             center = (
                 (float(boundary.bounds.minx) + float(boundary.bounds.maxx)) / 2.0,
                 (float(boundary.bounds.miny) + float(boundary.bounds.maxy)) / 2.0,
                 0,
             )
 
-            scale = (1.0, 1.0, 1.0)
-
-            features2d = []
-            features3d = []
-
-            ## loop over 2d geometries touching current tile
-
-            for index, row in map2d_unfiltered[:].iterrows():
-
-                if row["geometry"].centroid.intersects(tile.geom):
-
-                    print(index, map2d_unfiltered.shape[0])
-                    bodies_feature = []
-                    bodies_feature_transformed = []
-                    multipolygons_feature = []
-
-                    lowestpoints = []
-                    lowestpoints_geo = []
-                    lowestpoints_target = []
-                    z_dist_max = 0
-
-                    ## loop over 3d bodies to find the ones touching current 2d geometry
-
-                    for body_id, (multipolygon, body) in enumerate(
-                        zip(bodies_multipolygons, bodies)
-                    ):
-
-                        if (
-                            row["geometry"]
-                            .buffer(1.0)
-                            .intersects(unary_union(multipolygon))
-                        ):
-
-                            vertices = body.vertices
-
-                            for vertex_id, vertex in enumerate(vertices):
-
-                                if lowestpoints == [] or round(vertex[2], 10) <= round(
-                                    lowestpoints[0][2], 10
-                                ):
-                                    if lowestpoints == [] or round(
-                                        vertex[2], 10
-                                    ) < round(lowestpoints[0][2], 10):
-                                        lowestpoints_geo = []
-                                        lowestpoints = []
-                                        lowestpoints_target = []
-
-                                    lowestpoints_geo.append(Point(vertex[0], vertex[1]))
-                                    lowestpoints.append(
-                                        (vertex[0], vertex[1], vertex[2])
-                                    )
-                                    lowestpoints_target.append(
-                                        (
-                                            (vertex[0] - center[0]) * scale[0],
-                                            (vertex[1] - center[1]) * scale[1],
-                                            (vertex[2] - center[2]) * scale[2],
-                                        )
-                                    )
-
-                            lowestpoints_geo_mp = MultiPoint(lowestpoints_geo)
-                            bodies_feature.append(body)
-                            multipolygons_feature.append(multipolygon)
-
-                    ## loop over adjectent tile to find terrain z-coordinate corresponding to lowest feature coordinate
-
-                    for tile_adjacent in tilingscheme.tiles:
-
-                        glb_filepath = str(
-                            Path(
-                                out_dirpath,
-                                "terrain"
-                                + "__"
-                                + str(tile_adjacent.id[0])
-                                + "_"
-                                + str(tile_adjacent.id[1])
-                                + ".glb",
-                            )
-                        )
-
-                        if os.path.isfile(
-                            glb_filepath
-                        ) and lowestpoints_geo_mp.intersects(tile_adjacent.geom):
-                            glb_reader = vtk.vtkGLTFReader()
-                            glb_reader.SetFileName(glb_filepath)
-                            glb_reader.Update()
-                            polydata = vtk.vtkCompositeDataGeometryFilter()
-                            polydata.SetInputConnection(glb_reader.GetOutputPort())
-                            polydata.Update()
-                            stl = polydata.GetOutput()
-
-                            for lowestpoint, lowestpoint_target in zip(
-                                lowestpoints, lowestpoints_target
-                            ):
-
-                                z_values = self._get_mesh_elevation_from_xy(
-                                    stl, (lowestpoint_target[0], lowestpoint_target[1])
-                                )
-                                print(
-                                    z_values,
-                                    lowestpoint_target,
-                                    stl.GetBounds(),
-                                    glb_filepath,
-                                    stl.GetBounds()[0]
-                                    < lowestpoint_target[0]
-                                    < stl.GetBounds()[1],
-                                    stl.GetBounds()[2]
-                                    < lowestpoint_target[1]
-                                    < stl.GetBounds()[3],
-                                )
-
-                                if z_values:
-                                    z_value_min = min(z_values)
-                                    z_dist = lowestpoint_target[2] - z_value_min
-                                    if not z_dist_max or z_dist > z_dist_max:
-                                        z_dist_max = z_dist
-
-                    ## loop over 3d bodies touching current 2d geometry and transform vertices in x,y, and z
-
-                    for body in bodies_feature:
-                        body_transformed = copy.deepcopy(body)
-                        vertices_transformed = []
-                        vertices = body.vertices
-
-                        for vertex_id, vertex in enumerate(vertices):
-                            vertices_transformed.append(
-                                [
-                                    (vertex[0] - center[0]) * scale[0],
-                                    (vertex[1] - center[1]) * scale[1],
-                                    ((vertex[2] - center[2]) * scale[2]) - z_dist_max,
-                                ]
-                            )
-
-                        body_transformed.vertices = vertices_transformed
-                        bodies_feature_transformed.append(body_transformed)
-
-                    ## create proper features from body 2d representation (multipolygon) and 3d bodies
-
-                    feature2d = unary_union(multipolygons_feature)
-
-                    features2d.append(unary_union(multipolygons_feature))
-                    features3d.append(
-                        trimesh.util.concatenate(bodies_feature_transformed)
-                    )
-                    logging.info(f"Feature3d added {len(features3d)}")
-
-            return features2d, features3d
-
-        def _get_mesh_elevation_from_xy(self, mesh, coord):
-
-            x_coord, y_coord = coord
-            pSource = [x_coord, y_coord, -9999999999]
-            pTarget = [x_coord, y_coord, 9999999999]
-
-            obbTree = vtk.vtkOBBTree()
-            obbTree.SetDataSet(mesh)
-            obbTree.BuildLocator()
-
-            pointsVTKintersection = vtk.vtkPoints()
-            code = obbTree.IntersectWithLine(
-                pSource, pTarget, pointsVTKintersection, None
-            )
-
-            pointsVTKIntersectionData = pointsVTKintersection.GetData()
-            noPointsVTKIntersection = pointsVTKIntersectionData.GetNumberOfTuples()
-            pointsIntersection = []
-            for idx in range(noPointsVTKIntersection):
-                _tup = pointsVTKIntersectionData.GetTuple3(idx)
-                pointsIntersection.append(_tup)
-
-            if not len(pointsIntersection) == 0:
-                return [pointsIntersection[0][2], pointsIntersection[1][2]]
-            else:
-                return None
-
-        def _poly_from_triangle(self, vertices, face):
-
-            points = [
-                [vertices[face[0]][0], vertices[face[0]][1]],
-                [vertices[face[1]][0], vertices[face[1]][1]],
-                [vertices[face[2]][0], vertices[face[2]][1]],
-            ]
-
-            face_poly_mp = MultiPoint(points)
-            face_poly = face_poly_mp.convex_hull
-            face_poly = make_valid(face_poly)
-
-            if face_poly.geom_type == "Polygon":
-                face_poly_out = face_poly
-            elif face_poly.geom_type in ["LineString", "Point"]:
-                face_poly_out = face_poly.buffer(0.1)
-            else:
-                face_poly_out = None
-
-            return face_poly_out
-
-    class Buildings(Features):
-        def __init__(
-            self,
-            description="buildings",
-            tilingscheme=None,
-            out_dirpath=tempfile.gettempdir(),
-            filepaths=None,
-            recombine_bodies=False,
-            simplify_factor=None,
-            tiles=None,
-            boundary=None,
-        ):
-
             for tile in tiles:
 
-                self.process(
-                    tilingscheme=tilingscheme,
-                    out_dirpath=out_dirpath,
-                    filepaths=filepaths,
-                    recombine_bodies=recombine_bodies,
-                    simplify_factor=simplify_factor,
-                    tile=tile,
-                    description=description,
-                    boundary=boundary,
-                )
-
-                tile.total_bounds = self.map2d.total_bounds
-
-                with open(
+                features_out_filepath = str(
                     Path(
                         out_dirpath,
-                        description + "__" + "_".join(str(x) for x in tile.id) + ".glb",
-                    ),
-                    "wb",
-                ) as f:
+                        description
+                        + "__"
+                        + str(tile.id[0])
+                        + "_"
+                        + str(tile.id[1])
+                        + ".glb",
+                    )
+                )
+
+                map2d_out_filepath = str(
+                    Path(
+                        out_dirpath,
+                        description
+                        + "__"
+                        + str(tile.id[0])
+                        + "_"
+                        + str(tile.id[1])
+                        + ".gpkg",
+                    )
+                )
+
+                map2d_adjacent_out_filepath = str(
+                    Path(
+                        out_dirpath,
+                        description
+                        + "_adjacent"
+                        + "__"
+                        + str(tile.id[0])
+                        + "_"
+                        + str(tile.id[1])
+                        + ".gpkg",
+                    )
+                )
+
+                adjacent_tiles = []
+                adjacent_tiles_x_min = None
+                adjacent_tiles_y_min = None
+                adjacent_tiles_x_max = None
+                adjacent_tiles_y_max = None
+
+                number_of_neighbours = 3
+
+                adjacent_tiles = []
+
+                for adjacent_tile_id_y in range(
+                    tile.id[0] - number_of_neighbours,
+                    tile.id[0] + number_of_neighbours + 1,
+                ):
+                    for adjacent_tile_id_x in range(
+                        tile.id[1] - number_of_neighbours,
+                        tile.id[1] + number_of_neighbours + 1,
+                    ):
+
+                        for adjacent_tile in tiles:
+
+                            if adjacent_tile.id == (
+                                adjacent_tile_id_x,
+                                adjacent_tile_id_y,
+                            ):
+                                adjacent_tiles_x_min = (
+                                    min(
+                                        adjacent_tile.geom.bounds[0],
+                                        adjacent_tiles_x_min,
+                                    )
+                                    if adjacent_tiles_x_min
+                                    else adjacent_tile.geom.bounds[0]
+                                )
+                                adjacent_tiles_y_min = (
+                                    min(
+                                        adjacent_tile.geom.bounds[1],
+                                        adjacent_tiles_y_min,
+                                    )
+                                    if adjacent_tiles_y_min
+                                    else adjacent_tile.geom.bounds[1]
+                                )
+                                adjacent_tiles_x_max = (
+                                    max(
+                                        adjacent_tile.geom.bounds[2],
+                                        adjacent_tiles_x_max,
+                                    )
+                                    if adjacent_tiles_x_max
+                                    else adjacent_tile.geom.bounds[2]
+                                )
+                                adjacent_tiles_y_max = (
+                                    max(
+                                        adjacent_tile.geom.bounds[3],
+                                        adjacent_tiles_y_max,
+                                    )
+                                    if adjacent_tiles_y_max
+                                    else adjacent_tile.geom.bounds[3]
+                                )
+
+                                adjacent_tiles.append(adjacent_tile)
+
+                adjacent_box = box(
+                    adjacent_tiles_x_min,
+                    adjacent_tiles_y_min,
+                    adjacent_tiles_x_max,
+                    adjacent_tiles_y_max,
+                )
+
+                for filepath in filepaths:
+
+                    scene = trimesh.load(filepath)
+
+                    meshes = []
+                    for key_id, key in enumerate(scene.geometry):
+                        if type(scene.geometry[key]).__name__ == "Trimesh":
+                            mesh = scene.geometry[key]
+                            mesh = filter_faces_by_geom(mesh, adjacent_box)
+                            meshes.append(mesh)
+
+                map2d_adjacent = get_2d_representation(meshes, boundary)
+                map2d_dict = {}
+                map2d_dict["geometry"] = []
+
+                scene_out = trimesh.Scene()
+                for index, row in map2d_adjacent.iterrows():
+                    for mesh_id, mesh in enumerate(meshes):
+                        if len(mesh.faces) > 0:
+
+                            if row["geometry"].centroid.intersects(tile.geom):
+                                mesh_component = filter_faces_by_geom(
+                                    mesh, row["geometry"]
+                                )
+                                z_lowest = get_stats(mesh_component)
+                                z_lowest_terrain = None
+
+                                for adjacent_tile in adjacent_tiles:
+
+                                    if Point(z_lowest[0], z_lowest[1]).intersects(
+                                        adjacent_tile.geom
+                                    ):
+
+                                        glb_filepath = str(
+                                            Path(
+                                                out_dirpath,
+                                                "terrain"
+                                                + "__"
+                                                + str(adjacent_tile.id[0])
+                                                + "_"
+                                                + str(adjacent_tile.id[1])
+                                                + ".glb",
+                                            )
+                                        )
+
+                                        glb_reader = vtk.vtkGLTFReader()
+                                        glb_reader.SetFileName(glb_filepath)
+                                        glb_reader.Update()
+                                        polydata = vtk.vtkCompositeDataGeometryFilter()
+                                        polydata.SetInputConnection(
+                                            glb_reader.GetOutputPort()
+                                        )
+                                        polydata.Update()
+                                        stl = polydata.GetOutput()
+
+                                        scale = (1.0, 1.0, 1.0)
+                                        z_lowest_terrain = _get_mesh_elevation_from_xy(
+                                            stl,
+                                            (
+                                                (z_lowest[0] - center[0]) * scale[0],
+                                                (z_lowest[1] - center[1]) * scale[1],
+                                            ),
+                                        )
+
+                                if z_lowest_terrain:
+
+                                    x_offset = center[0] * -1
+                                    y_offset = center[1] * -1
+                                    z_offset = (z_lowest[2] - z_lowest_terrain) * -1
+
+                                    mesh_component = translate_vertices(
+                                        mesh_component, (x_offset, y_offset, z_offset)
+                                    )
+
+                                    scene_out.add_geometry(
+                                        mesh_component,
+                                        node_name=str(index),
+                                        geom_name=str(index),
+                                    )
+
+                                    map2d_dict["geometry"].append(row["geometry"])
+
+                if map2d_adjacent.shape[0] > 0:
+                    map2d_adjacent.to_file(map2d_adjacent_out_filepath)
+
+                map2d = gpd.GeoDataFrame.from_dict(map2d_dict)
+                map2d = map2d.set_crs(boundary.crs, allow_override=True)
+
+                if map2d.shape[0] > 0:
+                    map2d.to_file(map2d_out_filepath)
+
+                tile.total_bounds = (
+                    min(map2d.total_bounds[0], tile.total_bounds[0]),
+                    min(map2d.total_bounds[1], tile.total_bounds[1]),
+                    max(map2d.total_bounds[2], tile.total_bounds[2]),
+                    max(map2d.total_bounds[3], tile.total_bounds[3]),
+                )
+
+                with open(features_out_filepath, "wb") as f:
                     f.write(
                         trimesh.exchange.gltf.export_glb(
-                            self.scene, include_normals=True
+                            scene_out, include_normals=True
                         )
                     )
-
-    def get_dem_information(self, dirpath):
-        return [None, None, None, None]
-
-    def define_tiles(self, boundary, origin, height=10, width=10):
-        pass

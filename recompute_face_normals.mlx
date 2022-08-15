@@ -1,0 +1,4 @@
+<!DOCTYPE FilterScript>
+<FilterScript>
+ <filter name="Re-Compute Face Normals"/>
+</FilterScript>

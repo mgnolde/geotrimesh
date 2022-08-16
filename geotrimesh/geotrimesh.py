@@ -246,6 +246,14 @@ class GeoSceneSet:
                 ]:
 
                     scene = trimesh.load(str(glb[1]))
+
+
+
+
+                    scene_out = trimesh.Scene()
+
+
+
                     mosaic, width, height = self.generate_ortho_mosaic(
                         filepaths, tile.total_bounds
                     )
@@ -277,7 +285,8 @@ class GeoSceneSet:
                     )
                     im = ImageOps.flip(im)
 
-                    scene_out = trimesh.Scene()
+
+
 
                     meshes = []
                     center = (
@@ -290,6 +299,7 @@ class GeoSceneSet:
                     # scale = (100000.0, 100000.0, 100000.0)
                     scale = (1.0, 1.0, 1.0)
 
+
                     vertices_nr = []
                     for key in scene.geometry:
                         if type(scene.geometry[key]).__name__ == "Trimesh":
@@ -298,14 +308,15 @@ class GeoSceneSet:
 
                             uv = []
                             vertices_switched_axes = []
-                            for vert in mesh_orig.vertices:
-                                x_local, y_local, z_local = vert
+                            vertex_normals_switched_axes = []
+                            for vert, vertex_normal in zip(mesh_orig.vertices,mesh_orig.vertex_normals):
+                                vert_x_local, vert_y_local, vert_z_local = vert
                                 vertices_switched_axes.append(
-                                    (x_local, z_local, y_local)
+                                    (vert_x_local, vert_z_local, vert_y_local*-1)
                                 )
 
-                                x = (float(x_local) / scale[0]) + center[0]
-                                y = (float(y_local) / scale[1]) + center[1]
+                                x = (float(vert_x_local) / scale[0]) + center[0]
+                                y = (float(vert_y_local) / scale[1]) + center[1]
 
                                 x_offset = x - tile.total_bounds[0]
                                 y_offset = tile.total_bounds[3] - y
@@ -322,34 +333,23 @@ class GeoSceneSet:
                                 uv=uv, image=im, material=material
                             )
 
-                            if not y_up:
-                                vertices = mesh_orig.vertices
-                            else:
-                                vertices = vertices_switched_axes
 
-                            mesh_orig_new = trimesh.Trimesh(
-                                vertices=vertices,
-                                faces=mesh_orig.faces,
-                                face_normals=mesh_orig.face_normals,
-                                vertex_normals=mesh_orig.vertex_normals,
-                                visual=color_visuals,
-                                validate=True,
-                                process=True,
-                            )
+                            mesh_orig.visual=color_visuals
+                            mesh_orig.vertices=vertices_switched_axes
+
 
                             clean_output = False
                             if clean_output:
-                                trimesh.repair.fix_inversion(mesh_orig_new, multibody=True)
-                                trimesh.repair.fix_normals(mesh_orig_new, multibody=True)
 
                                 open3d_mesh = open3d.geometry.TriangleMesh()
                                 open3d_mesh.vertices = open3d.utility.Vector3dVector(
-                                    mesh_orig_new.vertices
+                                    mesh_orig.vertices
                                 )
                                 open3d_mesh.triangles = open3d.utility.Vector3iVector(
-                                    mesh_orig_new.faces
+                                    mesh_orig.faces
                                 )
 
+                                open3d_mesh.normalize_normals()
                                 open3d_mesh.orient_triangles()
                                 open3d_mesh.compute_triangle_normals(normalized=True)
                                 open3d_mesh.compute_vertex_normals(normalized=True)
@@ -358,7 +358,7 @@ class GeoSceneSet:
                                 open3d_mesh.remove_duplicated_vertices()
                                 open3d_mesh.remove_unreferenced_vertices()
 
-                                mesh_orig_new = trimesh.Trimesh(
+                                mesh_orig = trimesh.Trimesh(
                                     vertices=open3d_mesh.vertices,
                                     faces=open3d_mesh.triangles,
                                     face_normals=open3d_mesh.triangle_normals,
@@ -368,8 +368,9 @@ class GeoSceneSet:
                                     process=False,
                                 )
 
+
                             scene_out.add_geometry(
-                                mesh_orig_new, node_name="mesh", geom_name="mesh"
+                                mesh_orig, node_name="mesh", geom_name="mesh"
                             )
 
                     with open(
@@ -390,6 +391,8 @@ class GeoSceneSet:
                                 scene_out, include_normals=True
                             )
                         )
+
+
 
         def generate_ortho_mosaic(self, filepaths, bounds):
 
@@ -1308,6 +1311,11 @@ class GeoSceneSet:
                             meshes.append(mesh)
 
                 map2d_adjacent = get_2d_representation(meshes, boundary)
+                if map2d_adjacent.shape[0] > 0:
+                    map2d_adjacent = map2d_adjacent.set_crs(boundary.crs, allow_override=True)
+                    map2d_adjacent.to_file(map2d_adjacent_out_filepath)
+
+
                 map2d_dict = {}
                 map2d_dict["geometry"] = []
 
@@ -1378,13 +1386,11 @@ class GeoSceneSet:
 
                                     map2d_dict["geometry"].append(row["geometry"])
 
-                if map2d_adjacent.shape[0] > 0:
-                    map2d_adjacent.to_file(map2d_adjacent_out_filepath)
 
                 map2d = gpd.GeoDataFrame.from_dict(map2d_dict)
-                map2d = map2d.set_crs(boundary.crs, allow_override=True)
 
                 if map2d.shape[0] > 0:
+                    map2d = map2d.set_crs(boundary.crs, allow_override=True)
                     map2d.to_file(map2d_out_filepath)
 
                 tile.total_bounds = (

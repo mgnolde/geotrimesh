@@ -301,7 +301,8 @@ class GeoSceneSet:
 
 
                     vertices_nr = []
-                    for key in scene.geometry:
+                    for key_id,key in enumerate(scene.geometry):
+
                         if type(scene.geometry[key]).__name__ == "Trimesh":
                             mesh_orig = scene.geometry[key]
                             vertices_nr.append(len(mesh_orig.vertices))
@@ -337,6 +338,24 @@ class GeoSceneSet:
                             mesh_orig.visual=color_visuals
                             mesh_orig.vertices=vertices_switched_axes
 
+                            #trimesh.repair.fix_winding(mesh_orig)
+
+
+                            """
+                            broken_faces = trimesh.repair.broken_faces(mesh_orig, color=None)
+
+                            for face_id in broken_faces:
+
+                                face0 = mesh_orig.faces[face_id][0]
+                                face1 = mesh_orig.faces[face_id][1]
+                                face2 = mesh_orig.faces[face_id][2]
+
+                                mesh_orig.faces[face_id][0] = face2
+                                mesh_orig.faces[face_id][1] = face1
+                                mesh_orig.faces[face_id][2] = face0
+                            """
+
+
 
                             clean_output = False
                             if clean_output:
@@ -349,28 +368,21 @@ class GeoSceneSet:
                                     mesh_orig.faces
                                 )
 
-                                open3d_mesh.normalize_normals()
                                 open3d_mesh.orient_triangles()
-                                open3d_mesh.compute_triangle_normals(normalized=True)
-                                open3d_mesh.compute_vertex_normals(normalized=True)
-                                open3d_mesh.remove_degenerate_triangles()
-                                open3d_mesh.remove_duplicated_triangles()
-                                open3d_mesh.remove_duplicated_vertices()
-                                open3d_mesh.remove_unreferenced_vertices()
+                                #open3d_mesh.compute_triangle_normals(normalized=True)
+                                #open3d_mesh.compute_vertex_normals(normalized=True)
+                                #open3d_mesh.remove_degenerate_triangles()
+                                #open3d_mesh.remove_duplicated_triangles()
+                                #open3d_mesh.remove_duplicated_vertices()
+                                #open3d_mesh.remove_unreferenced_vertices()
 
-                                mesh_orig = trimesh.Trimesh(
-                                    vertices=open3d_mesh.vertices,
-                                    faces=open3d_mesh.triangles,
-                                    face_normals=open3d_mesh.triangle_normals,
-                                    vertex_normals=open3d_mesh.vertex_normals,
-                                    visual=color_visuals,
-                                    validate=True,
-                                    process=False,
-                                )
-
+                                mesh_orig.vertices=open3d_mesh.vertices
+                                mesh_orig.faces=open3d_mesh.triangles
+                                #mesh_orig.face_normals=open3d_mesh.triangle_normals
+                                #mesh_orig.vertex_normals=open3d_mesh.vertex_normals
 
                             scene_out.add_geometry(
-                                mesh_orig, node_name="mesh", geom_name="mesh"
+                                mesh_orig, node_name=str(key_id), geom_name=str(key_id)
                             )
 
                     with open(
@@ -1038,6 +1050,8 @@ class GeoSceneSet:
             tiles=None,
             boundary=None,
             offset=None,
+            margin = 150,
+            number_of_neighbours=3
         ):
 
             logging.info("Processing Features")
@@ -1233,12 +1247,11 @@ class GeoSceneSet:
                 )
 
                 adjacent_tiles = []
-                adjacent_tiles_x_min = None
-                adjacent_tiles_y_min = None
-                adjacent_tiles_x_max = None
-                adjacent_tiles_y_max = None
+                adjacent_tiles_x_min = tile.geom.bounds[0] - margin
+                adjacent_tiles_y_min = tile.geom.bounds[1] - margin
+                adjacent_tiles_x_max = tile.geom.bounds[2] + margin
+                adjacent_tiles_y_max = tile.geom.bounds[3] + margin
 
-                number_of_neighbours = 3
 
                 adjacent_tiles = []
 
@@ -1254,41 +1267,9 @@ class GeoSceneSet:
                         for adjacent_tile in tiles:
 
                             if adjacent_tile.id == (
-                                adjacent_tile_id_x,
                                 adjacent_tile_id_y,
+                                adjacent_tile_id_x
                             ):
-                                adjacent_tiles_x_min = (
-                                    min(
-                                        adjacent_tile.geom.bounds[0],
-                                        adjacent_tiles_x_min,
-                                    )
-                                    if adjacent_tiles_x_min
-                                    else adjacent_tile.geom.bounds[0]
-                                )
-                                adjacent_tiles_y_min = (
-                                    min(
-                                        adjacent_tile.geom.bounds[1],
-                                        adjacent_tiles_y_min,
-                                    )
-                                    if adjacent_tiles_y_min
-                                    else adjacent_tile.geom.bounds[1]
-                                )
-                                adjacent_tiles_x_max = (
-                                    max(
-                                        adjacent_tile.geom.bounds[2],
-                                        adjacent_tiles_x_max,
-                                    )
-                                    if adjacent_tiles_x_max
-                                    else adjacent_tile.geom.bounds[2]
-                                )
-                                adjacent_tiles_y_max = (
-                                    max(
-                                        adjacent_tile.geom.bounds[3],
-                                        adjacent_tiles_y_max,
-                                    )
-                                    if adjacent_tiles_y_max
-                                    else adjacent_tile.geom.bounds[3]
-                                )
 
                                 adjacent_tiles.append(adjacent_tile)
 
@@ -1298,6 +1279,7 @@ class GeoSceneSet:
                     adjacent_tiles_x_max,
                     adjacent_tiles_y_max,
                 )
+
 
                 for filepath in filepaths:
 

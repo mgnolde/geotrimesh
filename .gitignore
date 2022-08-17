@@ -2,3 +2,4 @@
 *.stl
 *.scad
 __pycache__/
+data/

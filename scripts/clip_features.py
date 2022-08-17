@@ -29,17 +29,18 @@ def _check_face_inside_box(vertices, face, box, offset):
     return inside
 
 
-## Get these values by opening the original file in the FZKViewer (appear when loaded)
+## Get these values by opening a CityGML file in the FZKViewer (appear when loaded)
 x_min_orig = 2677116.375000
 y_min_orig = 1241839.025000
 x_max_orig = 2689381.985000
 y_max_orig = 1254150.950000
 
 
-data_dirpath = Path(os.getcwd(), "demodata")
-boundary_filepath = Path(data_dirpath, "bbox.gpkg")
-features_filepath = Path(data_dirpath, "zurich_lod2.gpkg")
-features_out_filepath = Path(data_dirpath, "zurich_lod2_clip.gpkg")
+data_dirpath = Path(os.getcwd(), "data")
+demodata_dirpath = Path(os.getcwd(), "demodata")
+boundary_filepath = Path(demodata_dirpath, "bbox.gpkg")
+features_filepath = Path(data_dirpath, "zurich_lod2.glb")
+features_out_filepath = Path(demodata_dirpath, "zurich_lod2_clip.glb")
 
 boundary = gpd.read_file(boundary_filepath).dissolve().explode(index_parts=True)
 
@@ -66,15 +67,7 @@ for key_id, key in enumerate(scene.geometry):
     if type(scene.geometry[key]).__name__ == "Trimesh":
         mesh = scene.geometry[key]
 
-        logging.info(
-            key_id,
-            "faces:",
-            mesh.faces.shape[0],
-            "vertices:",
-            mesh.vertices.shape[0],
-            "bounds:",
-            mesh.bounds,
-        )
+        logging.info(f"{key_id} faces: {mesh.faces.shape[0]}, vertices: {mesh.vertices.shape[0]} bounds: {mesh.bounds}")
 
         face_mask = []
         for face in mesh.faces:
@@ -84,15 +77,8 @@ for key_id, key in enumerate(scene.geometry):
             face_mask.append(is_inside)
 
         mesh.update_faces(face_mask)
-        logging.info(
-            key_id,
-            "faces:",
-            mesh.faces.shape[0],
-            "vertices:",
-            mesh.vertices.shape[0],
-            "bounds:",
-            mesh.bounds,
-        )
+        logging.info(f"{key_id} faces: {mesh.faces.shape[0]}, vertices: {mesh.vertices.shape[0]} bounds: {mesh.bounds}")
+
 
         vertices_transformed = []
         for vertex_id, vertex in enumerate(mesh.vertices):

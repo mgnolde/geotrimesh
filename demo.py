@@ -13,6 +13,8 @@ parser.add_argument("out_dir", help="", nargs="?", default=Path(tempfile.gettemp
 args = parser.parse_args()
 out_dirpath = args.out_dir
 
+assert len(out_dirpath) > 0
+
 data_dirpath = Path(os.getcwd(), "demodata")
 boundary_filepath = Path(data_dirpath, "bbox.gpkg")
 buildings_filepaths = [Path(data_dirpath, "zurich_lod2_clip.glb")]

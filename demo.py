@@ -15,12 +15,12 @@ out_dirpath = args.out_dir
 
 assert len(out_dirpath) > 0
 
-data_dirpath = Path(os.getcwd(), "demodata")
-boundary_filepath = Path(data_dirpath, "bbox.gpkg")
-buildings_filepaths = [Path(data_dirpath, "zurich_lod2_clip.glb")]
+demodata_dirpath = Path(os.getcwd(), "demodata")
+boundary_filepath = Path(demodata_dirpath, "bbox.gpkg")
+buildings_filepaths = [Path(demodata_dirpath, "zurich_lod2_clip.glb")]
 
-dem_filepaths = [Path(data_dirpath, "dtm_26830_12470_clip.tif")]
-ortho_filepaths = [Path(data_dirpath, "2507_clip.tif")]
+dem_filepaths = [Path(demodata_dirpath, "dtm_26830_12470_clip.tif")]
+ortho_filepaths = [Path(demodata_dirpath, "2507_clip.tif")]
 trees_filepaths = []
 
 boundary = gpd.read_file(boundary_filepath).dissolve().explode(index_parts=True)
@@ -32,7 +32,7 @@ tilingscheme.gdf.to_file(Path(out_dirpath, "tiles.gpkg"))
 #zurich.terrain = GeoSceneSet.Terrain(
 #    out_dirpath=out_dirpath,
 #    filepaths=dem_filepaths,
-#    tiles=tilingscheme.tiles[0:3],
+#    tiles=tilingscheme.tiles[0:4],
 #    boundary=boundary
 #)
 
@@ -43,7 +43,7 @@ zurich.buildings = GeoSceneSet.Features(
     filepaths=buildings_filepaths,
     recombine_bodies=True,
     boundary=boundary,
-    tiles=tilingscheme.tiles[0:3],
+    tiles=tilingscheme.tiles[0:4],
 )
 
 zurich.ortho = GeoSceneSet.Ortho(
@@ -51,5 +51,5 @@ zurich.ortho = GeoSceneSet.Ortho(
     out_dirpath=out_dirpath,
     filepaths=ortho_filepaths,
     boundary=boundary,
-    tiles=tilingscheme.tiles[0:3],
+    tiles=tilingscheme.tiles[0:4],
 )

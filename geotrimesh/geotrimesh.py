@@ -255,7 +255,7 @@ class GeoSceneSet:
 
 
                     mosaic, width, height = self.generate_ortho_mosaic(
-                        filepaths, tile.total_bounds
+                        filepaths, tile
                     )
 
                     mosaic_rearranged = np.transpose(mosaic, axes=[1, 2, 0])
@@ -299,6 +299,18 @@ class GeoSceneSet:
                     # scale = (100000.0, 100000.0, 100000.0)
                     scale = (1.0, 1.0, 1.0)
 
+                    left, bottom, right, top = tile.total_bounds
+                    left -= tile.res[1] * 1.0
+                    #bottom -= tile.res[0] * 0.5
+                    #right += tile.res[1] * 0.5
+                    top += tile.res[0] * 1.0
+                    print("[", tile.id, "]", "total_bounds", left, bottom, right, top)
+
+
+                    x_ratio_min = None
+                    x_ratio_max = None
+                    y_ratio_min = None
+                    y_ratio_max = None
 
                     vertices_nr = []
                     for key_id,key in enumerate(scene.geometry):
@@ -319,14 +331,28 @@ class GeoSceneSet:
                                 x = (float(vert_x_local) / scale[0]) + center[0]
                                 y = (float(vert_y_local) / scale[1]) + center[1]
 
-                                x_offset = x - tile.total_bounds[0]
-                                y_offset = tile.total_bounds[3] - y
 
-                                dem_x_dist = tile.total_bounds[2] - tile.total_bounds[0]
-                                dem_y_dist = tile.total_bounds[3] - tile.total_bounds[1]
+                                x_offset = x - left
+                                y_offset = top - y
+
+                                dem_x_dist = right - left
+                                dem_y_dist = top - bottom
 
                                 x_ratio = round(x_offset / float(dem_x_dist), 2)
                                 y_ratio = round(y_offset / float(dem_y_dist), 2)
+
+                                if not x_ratio_min or x_ratio < x_ratio_min:
+                                    x_ratio_min = x_ratio
+                                if not x_ratio_max or x_ratio > x_ratio_max:
+                                    x_ratio_max = x_ratio
+
+                                if not y_ratio_min or y_ratio < y_ratio_min:
+                                    y_ratio_min = y_ratio
+                                if not y_ratio_max or y_ratio > y_ratio_max:
+                                    y_ratio_max = y_ratio
+
+
+
                                 uv.append(np.array([x_ratio, y_ratio]))
 
                             material = trimesh.visual.texture.SimpleMaterial(image=im)
@@ -334,6 +360,9 @@ class GeoSceneSet:
                                 uv=uv, image=im, material=material
                             )
 
+                            #print(left, bottom, right, top)
+
+                            print("ratio min/max", glb, x_ratio_min, y_ratio_min, x_ratio_max, y_ratio_max)
 
                             mesh_orig.visual=color_visuals
                             mesh_orig.vertices=vertices_switched_axes
@@ -406,9 +435,18 @@ class GeoSceneSet:
 
 
 
-        def generate_ortho_mosaic(self, filepaths, bounds):
+        def generate_ortho_mosaic(self, filepaths, tile):
 
-            left, bottom, right, top = bounds
+            #print(tile.total_bounds)
+            #sys.exit()
+
+            left, bottom, right, top = tile.total_bounds
+            left -= tile.res[1] * 1.0
+            #bottom -= tile.res[0] * 0.5
+            #right += tile.res[1]* 0.5
+            top += tile.res[0] * 1.0
+
+
             with rasterio.open(str(filepaths[0])) as src:
                 res_x, res_y = src.res
 
@@ -467,19 +505,35 @@ class GeoSceneSet:
                     openscad_bin_filepath,
                 )
 
+
+                """
                 open3d_mesh = open3d.geometry.TriangleMesh()
                 open3d_mesh.vertices = open3d.utility.Vector3dVector(self.mesh.vertices)
                 open3d_mesh.triangles = open3d.utility.Vector3iVector(self.mesh.faces)
 
                 open3d_mesh = open3d_mesh.simplify_quadric_decimation(
                     target_number_of_triangles=int(
-                        round(len(self.mesh.vertices) / 100, 2)
+                        round(len(self.mesh.vertices) / 100, 0)
                     )
                 )
 
+                vertices = np.asarray(open3d_mesh.vertices)
+                vertices_xy = vertices[:,0:2]
+
+                from scipy.spatial import Delaunay
+                triangles = Delaunay(vertices_xy, qhull_options='QJ')
+
+                faces = np.zeros((len(triangles.simplices),3), dtype=int)
+                for simplex_id, simplex in enumerate(triangles.simplices):
+                    faces[simplex_id][0] = simplex[0]
+                    faces[simplex_id][1] = simplex[1]
+                    faces[simplex_id][2] = simplex[2]
+
                 self.mesh = trimesh.Trimesh(
-                    vertices=open3d_mesh.vertices, faces=open3d_mesh.triangles
+                    vertices=vertices, faces=faces
                 )
+                """
+
 
                 self.scene = trimesh.Scene()
                 self.scene.add_geometry(self.mesh, node_name="mesh", geom_name="mesh")
@@ -499,13 +553,18 @@ class GeoSceneSet:
 
         def generate_terrain_mosaic(self, filepaths, tile):
 
-            rast = np.ones(tile.dims, dtype=np.float32) * tile.nodata
+            rast = np.ones((tile.dims[0]+1, tile.dims[1]+1), dtype=np.float32) * tile.nodata
             z_min_total = None
             z_max_total = None
 
             for filepath in filepaths:
                 with rasterio.open(filepath) as src:
                     left, bottom, right, top = tile.geom.bounds
+                    #left -= tile.res[1]
+                    bottom -= tile.res[0]
+                    right += tile.res[1]
+                    #top += tile.res[0]
+
 
                     meta = src.read(1)
 
@@ -531,6 +590,12 @@ class GeoSceneSet:
         def _get_polyhedron_faces(self, rast, tile, boundary, z_bounds):
 
             left, bottom, right, top = tile.geom.bounds
+            left -= tile.res[1]
+            bottom -= tile.res[0]
+            right += tile.res[1]
+            top += tile.res[0]
+
+
             center = (
                 (float(boundary.bounds.minx) + float(boundary.bounds.maxx)) / 2.0,
                 (float(boundary.bounds.miny) + float(boundary.bounds.maxy)) / 2.0,
@@ -541,10 +606,10 @@ class GeoSceneSet:
             # scale = (100000.0, 100000.0, 100000.0)
 
             polyhedron_faces_array = np.zeros(
-                (tile.dims[0], tile.dims[1], 16, 3), dtype=np.int32
+                ((tile.dims[0]+1), (tile.dims[1]+1), 16, 3), dtype=np.int32
             )
             polyhedron_points_floor_array = np.zeros(
-                (tile.dims[0] * tile.dims[1], 3), dtype=np.float32
+                ((tile.dims[0]+1) * (tile.dims[1]+1), 3), dtype=np.float32
             )
 
             cnt = 0
@@ -553,11 +618,11 @@ class GeoSceneSet:
             dem_y_min = None
             dem_y_max = None
 
-            for i in range(0, tile.dims[0]):
+            for i in range(0, tile.dims[0]+1):
 
-                logging.info(f"Row: {i} of {tile.dims[0]}")
+                #logging.info(f"Row: {i} of {tile.dims[0]}")
 
-                for j in range(0, tile.dims[1]):
+                for j in range(0, tile.dims[1]+1):
 
                     i0_coord = top - (tile.res[1] * i)
                     j0_coord = left + (tile.res[0] * j)
@@ -567,13 +632,13 @@ class GeoSceneSet:
                     dem_x = j0_coord
                     dem_y = i0_coord
 
-                    polyhedron_points_floor_array[(i * tile.dims[1]) + j][0] = (
+                    polyhedron_points_floor_array[(i * (tile.dims[1]+1)) + j][0] = (
                         dem_x - center[0]
                     ) * scale[0]
-                    polyhedron_points_floor_array[(i * tile.dims[1]) + j][1] = (
+                    polyhedron_points_floor_array[(i * (tile.dims[1]+1)) + j][1] = (
                         dem_y - center[1]
                     ) * scale[1]
-                    polyhedron_points_floor_array[(i * tile.dims[1]) + j][2] = (
+                    polyhedron_points_floor_array[(i * (tile.dims[1]+1)) + j][2] = (
                         z_a - center[2]
                     )
 
@@ -587,29 +652,29 @@ class GeoSceneSet:
                     if not dem_y_max or dem_y > dem_y_max:
                         dem_y_max = dem_y
 
-                    if i < tile.dims[0] - 1 and j < tile.dims[1] - 1:
+                    if i < (tile.dims[0]+1) - 1 and j < (tile.dims[1]+1) - 1:
 
                         z_b = rast[i + 1][j] * scale[2]
                         z_c = rast[i][j + 1] * scale[2]
                         z_d = rast[i + 1][j + 1] * scale[2]
 
-                        point_a_ceil = (i * tile.dims[1]) + j
-                        point_b_ceil = ((i + 1) * tile.dims[1]) + j
-                        point_c_ceil = (i * tile.dims[1]) + j + 1
-                        point_d_ceil = ((i + 1) * tile.dims[1]) + j + 1
+                        point_a_ceil = (i * (tile.dims[1]+1)) + j
+                        point_b_ceil = ((i + 1) * (tile.dims[1]+1)) + j
+                        point_c_ceil = (i * (tile.dims[1]+1)) + j + 1
+                        point_d_ceil = ((i + 1) * (tile.dims[1]+1)) + j + 1
 
                         point_a_floor = (
-                            (tile.dims[0] * tile.dims[1]) + (i * tile.dims[1]) + j
+                            ((tile.dims[0]+1) * (tile.dims[1]+1)) + (i * (tile.dims[1]+1)) + j
                         )
                         point_b_floor = (
-                            (tile.dims[0] * tile.dims[1]) + ((i + 1) * tile.dims[1]) + j
+                            ((tile.dims[0]+1) * (tile.dims[1]+1)) + ((i + 1) * (tile.dims[1]+1)) + j
                         )
                         point_c_floor = (
-                            (tile.dims[0] * tile.dims[1]) + (i * tile.dims[1]) + j + 1
+                            ((tile.dims[0]+1) * (tile.dims[1]+1)) + (i * (tile.dims[1]+1)) + j + 1
                         )
                         point_d_floor = (
-                            (tile.dims[0] * tile.dims[1])
-                            + ((i + 1) * tile.dims[1])
+                            ((tile.dims[0]+1) * (tile.dims[1]+1))
+                            + ((i + 1) * (tile.dims[1]+1))
                             + j
                             + 1
                         )
@@ -678,9 +743,9 @@ class GeoSceneSet:
 
             polyhedron_faces_clean = []
 
-            for i in range(0, tile.dims[0]):
+            for i in range(0, tile.dims[0]+1):
 
-                for j in range(0, tile.dims[1]):
+                for j in range(0, tile.dims[1]+1):
 
                     for polyhedron_face_id in range(0, 16):
 
@@ -696,9 +761,9 @@ class GeoSceneSet:
                         ):
 
                             i_bottom = i - 1 if i > 0 else 0
-                            i_top = i + 1 if i < tile.dims[0] - 1 else tile.dims[0] - 1
+                            i_top = i + 1 if i < (tile.dims[0]+1) - 1 else (tile.dims[0]+1) - 1
                             j_left = j - 1 if i > 0 else 0
-                            j_right = j + 1 if j < tile.dims[1] - 1 else tile.dims[1]
+                            j_right = j + 1 if j < (tile.dims[1]+1) - 1 else (tile.dims[1]+1)
 
                             for i_neighbour in range(i_bottom, i_top + 1):
                                 for j_neighbour in range(j_left, j_right + 1):
@@ -1311,6 +1376,7 @@ class GeoSceneSet:
                                     mesh, row["geometry"]
                                 )
                                 z_lowest = get_stats(mesh_component)
+
                                 z_lowest_terrain = None
 
                                 for adjacent_tile in adjacent_tiles:
@@ -1350,6 +1416,13 @@ class GeoSceneSet:
                                             ),
                                         )
 
+                                        if not z_lowest_terrain:
+                                            print(adjacent_tile.id[0], adjacent_tile.id[1], "error at", z_lowest[0], z_lowest[1], adjacent_tile.geom)
+                                            #sys.exit()
+
+
+
+
                                 if z_lowest_terrain:
 
                                     x_offset = center[0] * -1
@@ -1369,18 +1442,57 @@ class GeoSceneSet:
                                     map2d_dict["geometry"].append(row["geometry"])
 
 
+
+
                 map2d = gpd.GeoDataFrame.from_dict(map2d_dict)
 
                 if map2d.shape[0] > 0:
                     map2d = map2d.set_crs(boundary.crs, allow_override=True)
                     map2d.to_file(map2d_out_filepath)
 
+                #print(map2d.total_bounds)
+                print(tile.total_bounds)
+
+                map2d_left, map2d_bottom, map2d_right, map2d_top = map2d.total_bounds
+
+                """
+                if map2d_left < tile.total_bounds[0]:
+                    map2d_left = tile.total_bounds[0] - (math.ceil((tile.total_bounds[0] - map2d_left) / tile.res[0]) * tile.res[0])
+
+                if map2d_bottom < tile.total_bounds[1]:
+                    map2d_bottom = tile.total_bounds[1] - (math.ceil((tile.total_bounds[1] - map2d_bottom) / tile.res[1]) * tile.res[1])
+
+                if map2d_right > tile.total_bounds[2]:
+                    map2d_right = tile.total_bounds[2] + (math.ceil((map2d_right - tile.total_bounds[2]) / tile.res[0]) * tile.res[0])
+
+                if map2d_top > tile.total_bounds[3]:
+                    map2d_top = tile.total_bounds[3] + (math.ceil((map2d_top - tile.total_bounds[3]) / tile.res[1]) * tile.res[1])
+                """
+
+
                 tile.total_bounds = (
-                    min(map2d.total_bounds[0], tile.total_bounds[0]),
-                    min(map2d.total_bounds[1], tile.total_bounds[1]),
-                    max(map2d.total_bounds[2], tile.total_bounds[2]),
-                    max(map2d.total_bounds[3], tile.total_bounds[3]),
+                    min(map2d_left, tile.total_bounds[0]),
+                    min(map2d_bottom, tile.total_bounds[1]),
+                    max(map2d_right, tile.total_bounds[2]),
+                    max(map2d_top, tile.total_bounds[3]),
                 )
+
+                #tile.total_bounds = (
+                #    min(tile.total_bounds[0] - tile.res[0], tile.total_bounds[0]),
+                #    min(tile.total_bounds[1] - tile.res[1], tile.total_bounds[1]),
+                #    max(tile.total_bounds[2] + tile.res[0], tile.total_bounds[2]),
+                #    max(tile.total_bounds[3] + tile.res[1], tile.total_bounds[3]),
+                #)
+
+                #tile.total_bounds = (
+                #    min(tile.total_bounds[0] - tile.res[0], tile.total_bounds[0]),
+                #    tile.total_bounds[1],
+                #    tile.total_bounds[2],
+                #    tile.total_bounds[3],
+                #)
+
+                #print(tile.total_bounds)
+                #sys.exit()
 
                 with open(features_out_filepath, "wb") as f:
                     f.write(
@@ -1388,3 +1500,6 @@ class GeoSceneSet:
                             scene_out, include_normals=True
                         )
                     )
+
+                #print(tile.total_bounds)
+                #sys.exit()

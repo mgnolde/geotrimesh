@@ -19,14 +19,14 @@ demodata_dirpath = Path(os.getcwd(), "demodata")
 boundary_filepath = Path(demodata_dirpath, "bbox.gpkg")
 buildings_filepaths = [Path(demodata_dirpath, "zurich_lod2_clip.glb")]
 
-dem_filepaths = [Path(demodata_dirpath, "dtm_26830_12470_clip.tif")]
+dem_filepaths = [Path(demodata_dirpath, "dtm_26830_12470_clip_lq.tif")]
 ortho_filepaths = [Path(demodata_dirpath, "2507_clip.tif")]
 trees_filepaths = []
 
 boundary = gpd.read_file(boundary_filepath).dissolve().explode(index_parts=True)
 zurich = GeoSceneSet()
 
-tilingscheme = GeoSceneSet.TilingScheme(boundary, dem_filepaths, height=256, width=256)
+tilingscheme = GeoSceneSet.TilingScheme(boundary, dem_filepaths, height=32, width=32)
 tilingscheme.gdf.to_file(Path(out_dirpath, "tiles.gpkg"))
 
 #zurich.terrain = GeoSceneSet.Terrain(

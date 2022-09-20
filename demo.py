@@ -33,7 +33,7 @@ tilingscheme.gdf.to_file(Path(out_dirpath, "tiles.gpkg"))
 zurich.terrain = GeoSceneSet.Terrain(
     out_dirpath=out_dirpath,
     filepaths=dem_filepaths,
-    tiles=tilingscheme.tiles[3:4],
+    tiles=tilingscheme.tiles[0:4],
     boundary=boundary
 )
 

@@ -9,11 +9,12 @@ import argparse
 logging.basicConfig(level=logging.INFO)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("out_dir", help="", nargs="?", default=Path(tempfile.gettempdir()))
+parser.add_argument("out_dir", help="", nargs="?", default=Path(os.getcwd(), os.pardir, "mat"))
 args = parser.parse_args()
 out_dirpath = args.out_dir
 
-assert len(out_dirpath) > 0
+if not os.path.isdir(out_dirpath):
+    os.makedirs(out_dirpath)
 
 demodata_dirpath = Path(os.getcwd(), "demodata")
 boundary_filepath = Path(demodata_dirpath, "bbox.gpkg")
@@ -29,12 +30,12 @@ zurich = GeoSceneSet()
 tilingscheme = GeoSceneSet.TilingScheme(boundary, dem_filepaths, height=32, width=32)
 tilingscheme.gdf.to_file(Path(out_dirpath, "tiles.gpkg"))
 
-#zurich.terrain = GeoSceneSet.Terrain(
-#    out_dirpath=out_dirpath,
-#    filepaths=dem_filepaths,
-#    tiles=tilingscheme.tiles[0:4],
-#    boundary=boundary
-#)
+zurich.terrain = GeoSceneSet.Terrain(
+    out_dirpath=out_dirpath,
+    filepaths=dem_filepaths,
+    tiles=tilingscheme.tiles[3:4],
+    boundary=boundary
+)
 
 zurich.buildings = GeoSceneSet.Features(
     "buildings",

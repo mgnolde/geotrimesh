@@ -300,11 +300,16 @@ class GeoSceneSet:
                     scale = (1.0, 1.0, 1.0)
 
                     left, bottom, right, top = tile.total_bounds
-                    left -= tile.res[1] * 1.0
+                    #left -= tile.res[1] * 1.0
                     #bottom -= tile.res[0] * 0.5
                     #right += tile.res[1] * 0.5
-                    top += tile.res[0] * 1.0
+                    #top += tile.res[0] * 1.0
                     print("[", tile.id, "]", "total_bounds", left, bottom, right, top)
+
+
+                    #print((tile.total_bounds[2] - tile.total_bounds[0]) / tile.res[0])
+                    #print((tile.total_bounds[3] - tile.total_bounds[1]) / tile.res[1])
+                    #sys.exit()
 
 
                     x_ratio_min = None
@@ -332,14 +337,30 @@ class GeoSceneSet:
                                 y = (float(vert_y_local) / scale[1]) + center[1]
 
 
-                                x_offset = x - left
+
+                                x_offset = x - left# + tile.res[0]
                                 y_offset = top - y
 
                                 dem_x_dist = right - left
                                 dem_y_dist = top - bottom
 
-                                x_ratio = round(x_offset / float(dem_x_dist), 2)
-                                y_ratio = round(y_offset / float(dem_y_dist), 2)
+                                x_ratio = round(x_offset / float(dem_x_dist), 10)
+                                y_ratio = round(y_offset / float(dem_y_dist), 10)
+
+                                """
+                                if x_ratio > 1.0 or y_ratio > 1.0 or x_ratio < 0.0 or y_ratio < 0.0:  
+                                    print()
+                                    print(tile.id)
+                                    print(key_id)
+                                    print(len(scene.geometry))
+                                    print(tile.total_bounds[0], tile.total_bounds[1], tile.total_bounds[2], tile.total_bounds[3])
+                                    print(left,bottom,right,top)
+                                    print(vert_x_local, vert_z_local, vert_y_local)
+                                    print(x,y)
+                                    print(x_ratio,y_ratio)
+                                    #sys.exit()
+                                """
+
 
                                 if not x_ratio_min or x_ratio < x_ratio_min:
                                     x_ratio_min = x_ratio
@@ -441,10 +462,10 @@ class GeoSceneSet:
             #sys.exit()
 
             left, bottom, right, top = tile.total_bounds
-            left -= tile.res[1] * 1.0
+            #left -= tile.res[1] * 1.0
             #bottom -= tile.res[0] * 0.5
             #right += tile.res[1]* 0.5
-            top += tile.res[0] * 1.0
+            #top += tile.res[0] * 1.0
 
 
             with rasterio.open(str(filepaths[0])) as src:
@@ -1228,12 +1249,12 @@ class GeoSceneSet:
                         [vertices[face[2]][0], vertices[face[2]][1]],
                     ]
 
-                    inside = False
+                    inside = True
                     for point in points:
 
                         p = Point(point[0], point[1])
-                        if p.intersects(geom):
-                            inside = True
+                        if not p.intersects(geom):
+                            inside = False
 
                     face_mask.append(inside)
 
@@ -1290,6 +1311,17 @@ class GeoSceneSet:
                     Path(
                         out_dirpath,
                         description
+                        + "__"
+                        + str(tile.id[0])
+                        + "_"
+                        + str(tile.id[1])
+                        + ".gpkg",
+                    )
+                )
+                map2d_total_bounds_out_filepath = str(
+                    Path(
+                        out_dirpath,
+                        description + "_total_bounds"
                         + "__"
                         + str(tile.id[0])
                         + "_"
@@ -1365,6 +1397,9 @@ class GeoSceneSet:
 
                 map2d_dict = {}
                 map2d_dict["geometry"] = []
+                map2d_total_bounds_dict = {}
+                map2d_total_bounds_dict["geometry"] = []
+
 
                 scene_out = trimesh.Scene()
                 for index, row in map2d_adjacent.iterrows():
@@ -1418,7 +1453,6 @@ class GeoSceneSet:
 
                                         if not z_lowest_terrain:
                                             print(adjacent_tile.id[0], adjacent_tile.id[1], "error at", z_lowest[0], z_lowest[1], adjacent_tile.geom)
-                                            #sys.exit()
 
 
 
@@ -1450,12 +1484,10 @@ class GeoSceneSet:
                     map2d = map2d.set_crs(boundary.crs, allow_override=True)
                     map2d.to_file(map2d_out_filepath)
 
-                #print(map2d.total_bounds)
                 print(tile.total_bounds)
 
                 map2d_left, map2d_bottom, map2d_right, map2d_top = map2d.total_bounds
 
-                """
                 if map2d_left < tile.total_bounds[0]:
                     map2d_left = tile.total_bounds[0] - (math.ceil((tile.total_bounds[0] - map2d_left) / tile.res[0]) * tile.res[0])
 
@@ -1467,32 +1499,23 @@ class GeoSceneSet:
 
                 if map2d_top > tile.total_bounds[3]:
                     map2d_top = tile.total_bounds[3] + (math.ceil((map2d_top - tile.total_bounds[3]) / tile.res[1]) * tile.res[1])
-                """
 
 
                 tile.total_bounds = (
-                    min(map2d_left, tile.total_bounds[0]),
-                    min(map2d_bottom, tile.total_bounds[1]),
-                    max(map2d_right, tile.total_bounds[2]),
-                    max(map2d_top, tile.total_bounds[3]),
+                    min(map2d_left - tile.res[0], tile.total_bounds[0] - tile.res[0]),
+                    min(map2d_bottom - tile.res[1], tile.total_bounds[1] - tile.res[1]),
+                    max(map2d_right + tile.res[0], tile.total_bounds[2] + tile.res[0]),
+                    max(map2d_top + tile.res[1], tile.total_bounds[3] + tile.res[1]),
                 )
 
-                #tile.total_bounds = (
-                #    min(tile.total_bounds[0] - tile.res[0], tile.total_bounds[0]),
-                #    min(tile.total_bounds[1] - tile.res[1], tile.total_bounds[1]),
-                #    max(tile.total_bounds[2] + tile.res[0], tile.total_bounds[2]),
-                #    max(tile.total_bounds[3] + tile.res[1], tile.total_bounds[3]),
-                #)
+                map2d_total_bounds_dict["geometry"].append(box(tile.total_bounds[0], tile.total_bounds[1], tile.total_bounds[2], tile.total_bounds[3]))
+                map2d_total_bounds = gpd.GeoDataFrame.from_dict(map2d_total_bounds_dict)
 
-                #tile.total_bounds = (
-                #    min(tile.total_bounds[0] - tile.res[0], tile.total_bounds[0]),
-                #    tile.total_bounds[1],
-                #    tile.total_bounds[2],
-                #    tile.total_bounds[3],
-                #)
+                if map2d_total_bounds.shape[0] > 0:
+                    map2d_total_bounds = map2d_total_bounds.set_crs(boundary.crs, allow_override=True)
+                    map2d_total_bounds.to_file(map2d_total_bounds_out_filepath)
 
-                #print(tile.total_bounds)
-                #sys.exit()
+
 
                 with open(features_out_filepath, "wb") as f:
                     f.write(
@@ -1501,5 +1524,3 @@ class GeoSceneSet:
                         )
                     )
 
-                #print(tile.total_bounds)
-                #sys.exit()

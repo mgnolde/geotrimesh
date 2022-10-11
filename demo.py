@@ -53,4 +53,5 @@ zurich.ortho = GeoSceneSet.Ortho(
     filepaths=ortho_filepaths,
     boundary=boundary,
     tiles=tilingscheme.tiles[0:4],
+    include_texture=False
 )

@@ -1153,6 +1153,9 @@ class GeoSceneSet:
                         [x + x_offset, y + y_offset, z + z_offset]
                     )
 
+                    #print((x, y, z), (x+x_offset, y+y_offset, z+z_offset))
+
+
                 mesh_new = trimesh.Trimesh(
                     vertices=vertices_translated,
                     faces=mesh.faces,
@@ -1226,6 +1229,9 @@ class GeoSceneSet:
                         if not p.intersects(geom):
                             inside = False
 
+                    #if inside:
+                    #    print(inside, points, geom)
+                    #sys.exit()
                     face_mask.append(inside)
 
                 mesh_out = copy.deepcopy(mesh)
@@ -1266,7 +1272,7 @@ class GeoSceneSet:
             for tile in tiles:
 
                 print(tile.id)
-                if tile.valid and not (str(tile.total_bounds[0]) == "nan" ):
+                if True: #tile.valid and not (str(tile.total_bounds[0]) == "nan" ):
 
                     features_out_filepath = str(
                         Path(
@@ -1350,17 +1356,41 @@ class GeoSceneSet:
                         adjacent_tiles_y_max,
                     )
 
-
                     for filepath in filepaths:
-
+                        
                         scene = trimesh.load(filepath)
+
+                        #x_offset = center[0]
+                        #y_offset = center[1]
+                        #z_offset = 0
+
+                        x_min_orig = 2677116.375000
+                        y_min_orig = 1241839.025000
+                        x_max_orig = 2689381.985000
+                        y_max_orig = 1254150.950000
+
+                        #x_offset = (x_min_orig + x_max_orig) / 2.0
+                        #y_offset = (y_min_orig + y_max_orig) / 2.0
+                        #z_offset = 0
+
+                        xyz_min, xyz_max = scene.bounds
+                        x_min, y_min, z_min = xyz_min
+                        x_max, y_max, z_max = xyz_max
+
+                        x_offset = x_min_orig - x_min
+                        y_offset = y_min_orig - y_min
+                        z_offset = 0
+
 
                         meshes = []
                         for key_id, key in enumerate(scene.geometry):
                             if type(scene.geometry[key]).__name__ == "Trimesh":
                                 mesh = scene.geometry[key]
-                                mesh = filter_faces_by_geom(mesh, adjacent_box)
-                                meshes.append(mesh)
+                                mesh_new = translate_vertices(mesh, (x_offset, y_offset, z_offset))
+                                mesh_new = filter_faces_by_geom(mesh_new, adjacent_box)
+                                meshes.append(mesh_new)
+
+                        #print(len(meshes))
 
                     map2d_adjacent = get_2d_representation(meshes, boundary)
                     if map2d_adjacent.shape[0] > 0:
@@ -1379,8 +1409,9 @@ class GeoSceneSet:
                         for mesh_id, mesh in enumerate(meshes):
                             if len(mesh.faces) > 0:
 
+                                print(row["geometry"])
                                 if row["geometry"].centroid.intersects(tile.geom):
-                                    print(row["geometry"])
+
                                     mesh_component = filter_faces_by_geom(
                                         mesh, row["geometry"]
                                     )
@@ -1394,6 +1425,7 @@ class GeoSceneSet:
                                             adjacent_tile.geom
                                         ):
 
+                                            print("adjacent", adjacent_tile.id)
                                             glb_filepath = str(
                                                 Path(
                                                     out_dirpath,
@@ -1416,17 +1448,20 @@ class GeoSceneSet:
                                             polydata.Update()
                                             stl = polydata.GetOutput()
 
-                                            scale = (1.0, 1.0, 1.0)
-                                            z_lowest_terrain = _get_mesh_elevation_from_xy(
-                                                stl,
-                                                (
-                                                    (z_lowest[0] - center[0]) * scale[0],
-                                                    (z_lowest[1] - center[1]) * scale[1],
-                                                ),
-                                            )
+                                            ## check if source actually contains a mesh
+                                            if stl.GetPoints():
 
-                                            if not z_lowest_terrain:
-                                                print(adjacent_tile.id[0], adjacent_tile.id[1], "error at", z_lowest[0], z_lowest[1], adjacent_tile.geom)
+                                                scale = (1.0, 1.0, 1.0)
+                                                z_lowest_terrain = _get_mesh_elevation_from_xy(
+                                                    stl,
+                                                    (
+                                                        (z_lowest[0] - center[0]) * scale[0],
+                                                        (z_lowest[1] - center[1]) * scale[1],
+                                                    ),
+                                                )
+
+                                                if not z_lowest_terrain:
+                                                    print(adjacent_tile.id[0], adjacent_tile.id[1], "error at", z_lowest[0], z_lowest[1], adjacent_tile.geom)
 
 
 
@@ -1477,6 +1512,12 @@ class GeoSceneSet:
                         if map2d_top > tile.total_bounds[3]:
                             map2d_top = tile.total_bounds[3] + (math.ceil((map2d_top - tile.total_bounds[3]) / tile.res[1]) * tile.res[1])
 
+                        #tile.total_bounds = (
+                        #    min(map2d_left - (2*tile.res[0]), tile.total_bounds[0] - (2*tile.res[0])),
+                        #    min(map2d_bottom - (2*tile.res[1]), tile.total_bounds[1] - (2*tile.res[1])),
+                        #    max(map2d_right + (2*tile.res[0]), tile.total_bounds[2] + (2*tile.res[0])),
+                        #    max(map2d_top + (2*tile.res[1]), tile.total_bounds[3] + (2*tile.res[1])),
+                        #)
 
                         tile.total_bounds = (
                             min(map2d_left - tile.res[0], tile.total_bounds[0] - tile.res[0]),

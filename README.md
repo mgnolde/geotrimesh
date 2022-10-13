@@ -40,3 +40,4 @@ zurich.ortho = GeoSceneSet.Ortho(
 
 ![zurich](docs/zurich_1_0.png)
 ![zurich](docs/zurich_demo_paraview.png)
+![zurich](docs/zh_fin4.png)

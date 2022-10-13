@@ -11,6 +11,7 @@ from shapely.geometry import (
     MultiPolygon,
     MultiPoint,
 )
+from operator import itemgetter
 import warnings
 import trimesh
 import copy
@@ -1176,6 +1177,7 @@ class GeoSceneSet:
 
                 faces = mesh.faces
                 vertices = mesh.vertices
+                points_list = []
 
                 for face in faces:
 
@@ -1199,14 +1201,15 @@ class GeoSceneSet:
 
                     for point in points:
 
-                        z_max = max(z_max, point[2]) if z_max else point[2]
+                        points_list.append((point[0],point[1],point[2]))
+                        #z_max = max(z_max, point[2]) if z_max else point[2]
 
                         if not z_min or (z_min and point[2] < z_min):
                             z_min = point[2]
                             z_min_x = point[0]
                             z_min_y = point[1]
 
-                return (z_min_x, z_min_y, z_min)
+                return points_list
 
             def filter_faces_by_geom(mesh, geom):
 
@@ -1409,59 +1412,67 @@ class GeoSceneSet:
                         for mesh_id, mesh in enumerate(meshes):
                             if len(mesh.faces) > 0:
 
-                                print(row["geometry"])
+                                #print(row["geometry"])
                                 if row["geometry"].centroid.intersects(tile.geom):
 
                                     mesh_component = filter_faces_by_geom(
                                         mesh, row["geometry"]
                                     )
-                                    z_lowest = get_stats(mesh_component)
+                                    #z_lowest = get_stats(mesh_component)[0]
+                                    z_lowest_list = sorted(get_stats(mesh_component), key=itemgetter(2))[0:10]
+
+                                    print(z_lowest_list[0:3])
+                                    print(z_lowest_list[0:3000000])
 
                                     z_lowest_terrain = None
 
-                                    for adjacent_tile in adjacent_tiles:
+                                    for z_lowest in z_lowest_list:
 
-                                        if Point(z_lowest[0], z_lowest[1]).intersects(
-                                            adjacent_tile.geom
-                                        ):
+                                        for adjacent_tile in adjacent_tiles:
 
-                                            print("adjacent", adjacent_tile.id)
-                                            glb_filepath = str(
-                                                Path(
-                                                    out_dirpath,
-                                                    "terrain"
-                                                    + "__"
-                                                    + str(adjacent_tile.id[0])
-                                                    + "_"
-                                                    + str(adjacent_tile.id[1])
-                                                    + ".glb",
-                                                )
-                                            )
+                                            if Point(z_lowest[0], z_lowest[1]).intersects(
+                                                adjacent_tile.geom
+                                            ):
 
-                                            glb_reader = vtk.vtkGLTFReader()
-                                            glb_reader.SetFileName(glb_filepath)
-                                            glb_reader.Update()
-                                            polydata = vtk.vtkCompositeDataGeometryFilter()
-                                            polydata.SetInputConnection(
-                                                glb_reader.GetOutputPort()
-                                            )
-                                            polydata.Update()
-                                            stl = polydata.GetOutput()
-
-                                            ## check if source actually contains a mesh
-                                            if stl.GetPoints():
-
-                                                scale = (1.0, 1.0, 1.0)
-                                                z_lowest_terrain = _get_mesh_elevation_from_xy(
-                                                    stl,
-                                                    (
-                                                        (z_lowest[0] - center[0]) * scale[0],
-                                                        (z_lowest[1] - center[1]) * scale[1],
-                                                    ),
+                                                #print("adjacent", adjacent_tile.id)
+                                                glb_filepath = str(
+                                                    Path(
+                                                        out_dirpath,
+                                                        "terrain"
+                                                        + "__"
+                                                        + str(adjacent_tile.id[0])
+                                                        + "_"
+                                                        + str(adjacent_tile.id[1])
+                                                        + ".glb",
+                                                    )
                                                 )
 
-                                                if not z_lowest_terrain:
-                                                    print(adjacent_tile.id[0], adjacent_tile.id[1], "error at", z_lowest[0], z_lowest[1], adjacent_tile.geom)
+                                                glb_reader = vtk.vtkGLTFReader()
+                                                glb_reader.SetFileName(glb_filepath)
+                                                glb_reader.Update()
+                                                polydata = vtk.vtkCompositeDataGeometryFilter()
+                                                polydata.SetInputConnection(
+                                                    glb_reader.GetOutputPort()
+                                                )
+                                                polydata.Update()
+                                                stl = polydata.GetOutput()
+
+                                                ## check if source actually contains a mesh
+                                                if stl.GetPoints():
+
+                                                    scale = (1.0, 1.0, 1.0)
+                                                    z_lowest_terrain = _get_mesh_elevation_from_xy(
+                                                        stl,
+                                                        (
+                                                            (z_lowest[0] - center[0]) * scale[0],
+                                                            (z_lowest[1] - center[1]) * scale[1],
+                                                        ),
+                                                    )
+
+                                                    if not z_lowest_terrain:
+                                                        print(adjacent_tile.id[0], adjacent_tile.id[1], "error at", z_lowest[0], z_lowest[1], adjacent_tile.geom)
+                                                    else: 
+                                                        break
 
 
 
@@ -1512,19 +1523,19 @@ class GeoSceneSet:
                         if map2d_top > tile.total_bounds[3]:
                             map2d_top = tile.total_bounds[3] + (math.ceil((map2d_top - tile.total_bounds[3]) / tile.res[1]) * tile.res[1])
 
-                        #tile.total_bounds = (
-                        #    min(map2d_left - (2*tile.res[0]), tile.total_bounds[0] - (2*tile.res[0])),
-                        #    min(map2d_bottom - (2*tile.res[1]), tile.total_bounds[1] - (2*tile.res[1])),
-                        #    max(map2d_right + (2*tile.res[0]), tile.total_bounds[2] + (2*tile.res[0])),
-                        #    max(map2d_top + (2*tile.res[1]), tile.total_bounds[3] + (2*tile.res[1])),
-                        #)
-
                         tile.total_bounds = (
-                            min(map2d_left - tile.res[0], tile.total_bounds[0] - tile.res[0]),
-                            min(map2d_bottom - tile.res[1], tile.total_bounds[1] - tile.res[1]),
-                            max(map2d_right + tile.res[0], tile.total_bounds[2] + tile.res[0]),
-                            max(map2d_top + tile.res[1], tile.total_bounds[3] + tile.res[1]),
+                            min(map2d_left - (2*tile.res[0]), tile.total_bounds[0] - (2*tile.res[0])),
+                            min(map2d_bottom - (2*tile.res[1]), tile.total_bounds[1] - (2*tile.res[1])),
+                            max(map2d_right + (2*tile.res[0]), tile.total_bounds[2] + (2*tile.res[0])),
+                            max(map2d_top + (2*tile.res[1]), tile.total_bounds[3] + (2*tile.res[1])),
                         )
+
+                        #tile.total_bounds = (
+                        #    min(map2d_left - tile.res[0], tile.total_bounds[0] - tile.res[0]),
+                        #    min(map2d_bottom - tile.res[1], tile.total_bounds[1] - tile.res[1]),
+                        #    max(map2d_right + tile.res[0], tile.total_bounds[2] + tile.res[0]),
+                        #    max(map2d_top + tile.res[1], tile.total_bounds[3] + tile.res[1]),
+                        #)
 
                     print(tile.total_bounds[0], tile.total_bounds[1], tile.total_bounds[2], tile.total_bounds[3])
                     map2d_total_bounds_dict["geometry"].append(box(tile.total_bounds[0], tile.total_bounds[1], tile.total_bounds[2], tile.total_bounds[3]))

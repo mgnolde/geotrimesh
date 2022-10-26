@@ -8,10 +8,7 @@ import argparse
 
 logging.basicConfig(level=logging.INFO)
 
-parser = argparse.ArgumentParser()
-parser.add_argument("out_dir", help="", nargs="?", default=Path(os.getcwd(), os.pardir, "mat"))
-args = parser.parse_args()
-out_dirpath = args.out_dir
+out_dirpath = Path(os.getcwd(), "data")
 
 if not os.path.isdir(out_dirpath):
     os.makedirs(out_dirpath)
@@ -44,6 +41,7 @@ zurich.buildings = GeoSceneSet.Features(
     filepaths=buildings_filepaths,
     recombine_bodies=True,
     boundary=boundary,
+    extent_orig=[2677116.375000, 1241839.025000, 2689381.985000, 1254150.950000],
     tiles=tilingscheme.tiles[0:4],
 )
 

@@ -31,6 +31,11 @@ import subprocess
 from PIL import Image, ImageOps
 from rasterio.transform import Affine
 import open3d
+from gltflib import GLTF
+import tempfile
+import json
+
+
 
 logging.basicConfig(level=logging.INFO)
 warnings.filterwarnings("ignore")
@@ -71,6 +76,7 @@ class GeoSceneSet:
             self.dimns = None
             self.res = None
             self.gdf = None
+            self.features = []
 
             self.tiles = []
 
@@ -88,7 +94,7 @@ class GeoSceneSet:
             # scale = (100000.0, 100000.0, 100000.0)
             scale = (1.0, 1.0, 1.0)
 
-            print(upper_left, filepaths)
+            #print(upper_left, filepaths)
             upper_left_aoi, res, nodata = self.define_aoi_origin(upper_left, filepaths)
 
             tile = namedtuple(
@@ -209,12 +215,14 @@ class GeoSceneSet:
         def __init__(
             self,
             tilingscheme=None,
+            temp_dirpath=tempfile.gettempdir(),
             out_dirpath=tempfile.gettempdir(),
             filepaths=None,
             tiles=None,
             boundary=None,
             y_up=True,
-            include_texture=False
+            include_texture=False,
+            output_dict=False
         ):
 
             logging.info("Setting texture coordinates")
@@ -222,45 +230,24 @@ class GeoSceneSet:
             for tile in tiles:
 
                 if tile.valid:
-                    for glb_id, glb in enumerate([
-                        [
-                            "terrain",
-                            str(
+
+                    for glb_id,feature in enumerate(tilingscheme.features):
+                    
+                        glb = [feature, str(
                                 Path(
-                                    out_dirpath,
-                                    "terrain"
+                                    temp_dirpath,
+                                    feature
                                     + "__"
                                     + str(tile.id[0])
                                     + "_"
                                     + str(tile.id[1])
                                     + ".glb",
                                 )
-                            ),
-                        ],
-                        [
-                            "buildings",
-                            str(
-                                Path(
-                                    out_dirpath,
-                                    "buildings"
-                                    + "__"
-                                    + str(tile.id[0])
-                                    + "_"
-                                    + str(tile.id[1])
-                                    + ".glb",
-                                )
-                            ),
-                        ],
-                    ]):
+                            )]
 
                         scene = trimesh.load(str(glb[1]))
 
-
-
-
                         scene_out = trimesh.Scene()
-
-
 
                         mosaic, width, height = self.generate_ortho_mosaic(
                             filepaths, tile
@@ -317,7 +304,7 @@ class GeoSceneSet:
                         #bottom -= tile.res[0] * 0.5
                         #right += tile.res[1] * 0.5
                         #top += tile.res[0] * 1.0
-                        print("[", tile.id, "]", "total_bounds", left, bottom, right, top)
+                        #print("[", tile.id, "]", "total_bounds", left, bottom, right, top)
 
 
                         #print((tile.total_bounds[2] - tile.total_bounds[0]) / tile.res[0])
@@ -426,16 +413,11 @@ class GeoSceneSet:
                                 )
 
 
+                        out_filename_base = "result_" + glb[0] + "__" + str(tile.id[0]) + "_" + str(tile.id[1])
+
                         with open(
                             Path(
-                                out_dirpath,
-                                "result_"
-                                + glb[0]
-                                + "__"
-                                + str(tile.id[0])
-                                + "_"
-                                + str(tile.id[1])
-                                + ".glb",
+                                out_dirpath, out_filename_base + ".glb"
                             ),
                             "wb",
                         ) as f:
@@ -445,6 +427,10 @@ class GeoSceneSet:
                                 )
                             )
 
+                        if output_dict and len(scene_out.geometry)>0:
+                            scene_out_dict = trimesh.exchange.export.scene_to_dict(scene_out, use_base64=False, include_metadata=True)
+                            with open(Path(out_dirpath, out_filename_base + ".json"), 'w') as fp:
+                                json.dump(scene_out_dict, fp)
 
 
         def generate_ortho_mosaic(self, filepaths, tile):
@@ -485,15 +471,22 @@ class GeoSceneSet:
     class Terrain:
         def __init__(
             self,
+            tilingscheme=None,
+            temp_dirpath=tempfile.gettempdir(),
             out_dirpath=tempfile.gettempdir(),
             tiles=None,
             filepaths=[],
             tile=None,
             boundary=None,
+            description = "terrain",
             openscad_bin_filepath=Path("openscad"),
         ):
 
             logging.info("Processing Terrain")
+
+            if not description in tilingscheme.features:
+                tilingscheme.features.append(description)
+
 
             for tile in tiles:
 
@@ -506,7 +499,7 @@ class GeoSceneSet:
                     boundary,
                     self.z_bounds_total,
                     tile,
-                    out_dirpath,
+                    temp_dirpath,
                     openscad_bin_filepath,
                 )
 
@@ -514,11 +507,10 @@ class GeoSceneSet:
                 self.scene = trimesh.Scene()
                 self.scene.add_geometry(self.mesh, node_name="mesh", geom_name="mesh")
 
+                out_filename_base = description + "__" + str(tile.id[0]) + "_" + str(tile.id[1])
+
                 with open(
-                    Path(
-                        out_dirpath,
-                        "terrain__" + str(tile.id[0]) + "_" + str(tile.id[1]) + ".glb",
-                    ),
+                    Path(temp_dirpath, out_filename_base + ".glb"),
                     "wb",
                 ) as f:
                     f.write(
@@ -526,6 +518,8 @@ class GeoSceneSet:
                             self.scene, include_normals=True
                         )
                     )
+
+
 
         def generate_terrain_mosaic(self, filepaths, tile):
 
@@ -535,7 +529,7 @@ class GeoSceneSet:
             z_max_total = None
 
             for filepath in filepaths:
-                print(filepath, tile.geom.bounds, tile.res)
+                #print(filepath, tile.geom.bounds, tile.res)
                 with rasterio.open(filepath) as src:
                     left, bottom, right, top = tile.geom.bounds
                     #left -= tile.res[1]
@@ -1100,15 +1094,21 @@ class GeoSceneSet:
             self,
             description="feature",
             tilingscheme=None,
+            temp_dirpath=tempfile.gettempdir(),
             out_dirpath=tempfile.gettempdir(),
             filepaths=None,
             recombine_bodies=False,
             simplify_factor=None,
             tiles=None,
+            assets_dirpath=None,
+            asset_filename=None,
+            scale_factor=1.0,
             boundary=None,
             offset=None,
             margin = 150,
-            number_of_neighbours=3
+            extent_orig=None,
+            number_of_neighbours=3,
+            y_up=True
         ):
 
             logging.info("Processing Features")
@@ -1139,6 +1139,26 @@ class GeoSceneSet:
                     return max([pointsIntersection[0][2], pointsIntersection[1][2]])
                 else:
                     return None
+
+            def switch_axis(mesh):
+
+                vertices_switched_axes = []
+                vertex_normals_switched_axes = []
+                for vert, vertex_normal in zip(mesh.vertices,mesh.vertex_normals):
+                    vert_x_local, vert_y_local, vert_z_local = vert
+                    vertices_switched_axes.append(
+                        (vert_x_local, vert_z_local, vert_y_local)
+                    )
+
+                mesh_new = trimesh.Trimesh(
+                    vertices=vertices_switched_axes,
+                    faces=mesh.faces,
+                    face_normals=mesh.face_normals,
+                    vertex_normals=mesh.vertex_normals,
+                )
+
+                return mesh_new
+
 
             def translate_vertices(mesh, offset):
 
@@ -1266,20 +1286,26 @@ class GeoSceneSet:
 
                 return gdf
 
+
+            if not description in tilingscheme.features:
+                tilingscheme.features.append(description)
+
             center = (
                 (float(boundary.bounds.minx) + float(boundary.bounds.maxx)) / 2.0,
                 (float(boundary.bounds.miny) + float(boundary.bounds.maxy)) / 2.0,
                 0,
             )
 
+            scale = (1.0, 1.0, 1.0)
+
             for tile in tiles:
 
-                print(tile.id)
+                #print(tile.id)
                 if True: #tile.valid and not (str(tile.total_bounds[0]) == "nan" ):
 
                     features_out_filepath = str(
                         Path(
-                            out_dirpath,
+                            temp_dirpath,
                             description
                             + "__"
                             + str(tile.id[0])
@@ -1291,7 +1317,7 @@ class GeoSceneSet:
 
                     map2d_out_filepath = str(
                         Path(
-                            out_dirpath,
+                            temp_dirpath,
                             description
                             + "__"
                             + str(tile.id[0])
@@ -1302,7 +1328,7 @@ class GeoSceneSet:
                     )
                     map2d_total_bounds_out_filepath = str(
                         Path(
-                            out_dirpath,
+                            temp_dirpath,
                             description + "_total_bounds"
                             + "__"
                             + str(tile.id[0])
@@ -1314,7 +1340,7 @@ class GeoSceneSet:
 
                     map2d_adjacent_out_filepath = str(
                         Path(
-                            out_dirpath,
+                            temp_dirpath,
                             description
                             + "_adjacent"
                             + "__"
@@ -1352,6 +1378,13 @@ class GeoSceneSet:
 
                                     adjacent_tiles.append(adjacent_tile)
 
+                    tile_box = box(
+                        tile.geom.bounds[0],
+                        tile.geom.bounds[1],
+                        tile.geom.bounds[2],
+                        tile.geom.bounds[3]
+                    )
+
                     adjacent_box = box(
                         adjacent_tiles_x_min,
                         adjacent_tiles_y_min,
@@ -1359,41 +1392,68 @@ class GeoSceneSet:
                         adjacent_tiles_y_max,
                     )
 
+
+                    meshes = []
+
                     for filepath in filepaths:
+
+                        if filepath.suffix.lower() in [".glb"]:
                         
-                        scene = trimesh.load(filepath)
+                            scene = trimesh.load(filepath)
 
-                        #x_offset = center[0]
-                        #y_offset = center[1]
-                        #z_offset = 0
+                            x_min_orig, y_min_orig, x_max_orig, y_max_orig = extent_orig
 
-                        x_min_orig = 2677116.375000
-                        y_min_orig = 1241839.025000
-                        x_max_orig = 2689381.985000
-                        y_max_orig = 1254150.950000
+                            xyz_min, xyz_max = scene.bounds
+                            x_min, y_min, z_min = xyz_min
+                            x_max, y_max, z_max = xyz_max
 
-                        #x_offset = (x_min_orig + x_max_orig) / 2.0
-                        #y_offset = (y_min_orig + y_max_orig) / 2.0
-                        #z_offset = 0
+                            x_offset = x_min_orig - x_min
+                            y_offset = y_min_orig - y_min
+                            z_offset = 0
 
-                        xyz_min, xyz_max = scene.bounds
-                        x_min, y_min, z_min = xyz_min
-                        x_max, y_max, z_max = xyz_max
+                            for key_id, key in enumerate(scene.geometry):
+                                if type(scene.geometry[key]).__name__ == "Trimesh":
+                                    mesh = scene.geometry[key]
+                                    mesh_new = translate_vertices(mesh, (x_offset, y_offset, z_offset))
+                                    mesh_new = filter_faces_by_geom(mesh_new, adjacent_box)
+                                    meshes.append(mesh_new)
 
-                        x_offset = x_min_orig - x_min
-                        y_offset = y_min_orig - y_min
-                        z_offset = 0
+                                    #print(description, mesh_new.bounds)
 
 
-                        meshes = []
-                        for key_id, key in enumerate(scene.geometry):
-                            if type(scene.geometry[key]).__name__ == "Trimesh":
-                                mesh = scene.geometry[key]
-                                mesh_new = translate_vertices(mesh, (x_offset, y_offset, z_offset))
-                                mesh_new = filter_faces_by_geom(mesh_new, adjacent_box)
-                                meshes.append(mesh_new)
+                        elif filepath.suffix in [".gpkg", ".geojson"]:
+                            gdf = gpd.read_file(filepath).clip(tile_box)
+                            for geom_id,geom in enumerate(gdf["geometry"]):
+                                x_offset, y_offset, z_offset = center
 
-                        #print(len(meshes))
+
+                                x_offset = center[0] * -1
+                                y_offset = center[1] * -1
+                                z_offset = z_offset * -1
+
+                                scene = trimesh.load(Path(assets_dirpath, asset_filename))
+                                for key_id, key in enumerate(scene.geometry):
+                                    if type(scene.geometry[key]).__name__ == "Trimesh":
+                                        mesh = scene.geometry[key]
+                                        #mesh.apply_scale(1.0 / mesh.extents)
+                                        mesh.apply_scale(scale_factor / mesh.extents)
+                                        #mesh.apply_scale(10.0)
+                                        #mesh.apply_scale(10.0 * mesh.extents)
+                                        mesh_new = mesh
+                                        if y_up:
+                                            mesh_new = switch_axis(mesh_new)
+                                        mesh_new = translate_vertices(mesh_new, (geom.centroid.x, geom.centroid.y, 0))
+                                        #mesh_new = translate_vertices(mesh, (x_offset, y_offset, z_offset))
+                                        mesh_new = filter_faces_by_geom(mesh_new, adjacent_box)
+                                        meshes.append(mesh_new)
+
+                                        print(description, geom, mesh_new.bounds)
+
+
+
+                        else:
+                            pass
+
 
                     map2d_adjacent = get_2d_representation(meshes, boundary)
                     if map2d_adjacent.shape[0] > 0:
@@ -1421,8 +1481,8 @@ class GeoSceneSet:
                                     #z_lowest = get_stats(mesh_component)[0]
                                     z_lowest_list = sorted(get_stats(mesh_component), key=itemgetter(2))[0:10]
 
-                                    print(z_lowest_list[0:3])
-                                    print(z_lowest_list[0:3000000])
+                                    #print(z_lowest_list[0:3])
+                                    #print(z_lowest_list[0:3000000])
 
                                     z_lowest_terrain = None
 
@@ -1437,7 +1497,7 @@ class GeoSceneSet:
                                                 #print("adjacent", adjacent_tile.id)
                                                 glb_filepath = str(
                                                     Path(
-                                                        out_dirpath,
+                                                        temp_dirpath,
                                                         "terrain"
                                                         + "__"
                                                         + str(adjacent_tile.id[0])
@@ -1470,7 +1530,8 @@ class GeoSceneSet:
                                                     )
 
                                                     if not z_lowest_terrain:
-                                                        print(adjacent_tile.id[0], adjacent_tile.id[1], "error at", z_lowest[0], z_lowest[1], adjacent_tile.geom)
+                                                        pass
+                                                        #print(adjacent_tile.id[0], adjacent_tile.id[1], "error at", z_lowest[0], z_lowest[1], adjacent_tile.geom)
                                                     else: 
                                                         break
 
@@ -1537,7 +1598,7 @@ class GeoSceneSet:
                         #    max(map2d_top + tile.res[1], tile.total_bounds[3] + tile.res[1]),
                         #)
 
-                    print(tile.total_bounds[0], tile.total_bounds[1], tile.total_bounds[2], tile.total_bounds[3])
+                    #print(tile.total_bounds[0], tile.total_bounds[1], tile.total_bounds[2], tile.total_bounds[3])
                     map2d_total_bounds_dict["geometry"].append(box(tile.total_bounds[0], tile.total_bounds[1], tile.total_bounds[2], tile.total_bounds[3]))
                     map2d_total_bounds = gpd.GeoDataFrame.from_dict(map2d_total_bounds_dict)
 
@@ -1546,11 +1607,12 @@ class GeoSceneSet:
                         map2d_total_bounds.to_file(map2d_total_bounds_out_filepath)
 
 
-
                     with open(features_out_filepath, "wb") as f:
                         f.write(
                             trimesh.exchange.gltf.export_glb(
                                 scene_out, include_normals=True
                             )
                         )
+
+                   
 

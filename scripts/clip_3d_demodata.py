@@ -87,7 +87,7 @@ for key_id, key in enumerate(scene.geometry):
             )
 
         mesh_new = trimesh.Trimesh(
-            vertices=vertices_transformed,
+            vertices=mesh.vertices,
             faces=mesh.faces,
             face_normals=mesh.face_normals,
             vertex_normals=mesh.vertex_normals,
@@ -98,3 +98,4 @@ for key_id, key in enumerate(scene.geometry):
 
 with open(features_out_filepath, "wb") as f:
     f.write(trimesh.exchange.gltf.export_glb(scene_out, include_normals=True))
+print("Saved to", features_out_filepath)

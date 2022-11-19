@@ -34,6 +34,7 @@ import open3d
 from gltflib import GLTF
 import tempfile
 import json
+import loguru
 
 
 
@@ -76,7 +77,7 @@ class GeoSceneSet:
             self.dimns = None
             self.res = None
             self.gdf = None
-            self.features = []
+            self.features = {}
 
             self.tiles = []
 
@@ -368,8 +369,10 @@ class GeoSceneSet:
                                     uv=uv, image=im, material=material
                                 )
 
+                                # comment out to leave uv coords untouched
+                                if not tilingscheme.features[feature]["keep_uv"]:
+                                    mesh_orig.visual=color_visuals
 
-                                mesh_orig.visual=color_visuals
                                 mesh_orig.vertices=vertices_switched_axes
 
 
@@ -478,6 +481,7 @@ class GeoSceneSet:
             filepaths=[],
             tile=None,
             boundary=None,
+            keep_uv=False,
             description = "terrain",
             openscad_bin_filepath=Path("openscad"),
         ):
@@ -485,7 +489,7 @@ class GeoSceneSet:
             logging.info("Processing Terrain")
 
             if not description in tilingscheme.features:
-                tilingscheme.features.append(description)
+                tilingscheme.features[description] = {"keep_uv": keep_uv}
 
 
             for tile in tiles:
@@ -1107,6 +1111,7 @@ class GeoSceneSet:
             offset=None,
             margin = 150,
             extent_orig=None,
+            keep_uv=False,
             number_of_neighbours=3,
             y_up=True
         ):
@@ -1150,11 +1155,13 @@ class GeoSceneSet:
                         (vert_x_local, vert_z_local, vert_y_local)
                     )
 
+
                 mesh_new = trimesh.Trimesh(
                     vertices=vertices_switched_axes,
                     faces=mesh.faces,
                     face_normals=mesh.face_normals,
                     vertex_normals=mesh.vertex_normals,
+                    visual=mesh.visual,
                 )
 
                 return mesh_new
@@ -1174,17 +1181,16 @@ class GeoSceneSet:
                         [x + x_offset, y + y_offset, z + z_offset]
                     )
 
-                    #print((x, y, z), (x+x_offset, y+y_offset, z+z_offset))
-
-
                 mesh_new = trimesh.Trimesh(
                     vertices=vertices_translated,
                     faces=mesh.faces,
                     face_normals=mesh.face_normals,
                     vertex_normals=mesh.vertex_normals,
+                    visual=mesh.visual,
                 )
 
                 return mesh_new
+
 
             def get_stats(mesh):
 
@@ -1247,7 +1253,7 @@ class GeoSceneSet:
 
                     inside = True
                     for point in points:
-
+                        #print(point)
                         p = Point(point[0], point[1])
                         if not p.intersects(geom):
                             inside = False
@@ -1282,13 +1288,19 @@ class GeoSceneSet:
                         if poly.geom_type == "Polygon":
                             geoms.append(poly)
 
-                gdf = gpd.GeoDataFrame.from_dict({"geometry": unary_union(geoms)})
+                gdf = gpd.GeoDataFrame.from_dict([{"geometry": unary_union(geoms)}])
+                
+                try:
+                    gdf = gdf.dissolve().explode(index_parts=True)
+                except:
+                    #geometrycollection empty
+                    pass
 
                 return gdf
 
 
             if not description in tilingscheme.features:
-                tilingscheme.features.append(description)
+                tilingscheme.features[description] = {"keep_uv": keep_uv}
 
             center = (
                 (float(boundary.bounds.minx) + float(boundary.bounds.maxx)) / 2.0,
@@ -1298,10 +1310,11 @@ class GeoSceneSet:
 
             scale = (1.0, 1.0, 1.0)
 
-            for tile in tiles:
+            for tile_id, tile in enumerate(tiles):
 
-                #print(tile.id)
-                if True: #tile.valid and not (str(tile.total_bounds[0]) == "nan" ):
+                logging.info(f"Tile {tile_id} / {len(tiles)}")
+
+                if True:
 
                     features_out_filepath = str(
                         Path(
@@ -1391,15 +1404,17 @@ class GeoSceneSet:
                         adjacent_tiles_x_max,
                         adjacent_tiles_y_max,
                     )
-
+                    print(adjacent_box)
 
                     meshes = []
 
                     for filepath in filepaths:
-
                         if filepath.suffix.lower() in [".glb"]:
-                        
+
+                            logging.info(f"Loading {filepath}")
                             scene = trimesh.load(filepath)
+                            logging.info(f"Loading {filepath} finished")
+
 
                             x_min_orig, y_min_orig, x_max_orig, y_max_orig = extent_orig
 
@@ -1412,17 +1427,20 @@ class GeoSceneSet:
                             z_offset = 0
 
                             for key_id, key in enumerate(scene.geometry):
+                                logging.info(f"Adding mesh {key_id} of {len(scene.geometry)}")
+
                                 if type(scene.geometry[key]).__name__ == "Trimesh":
                                     mesh = scene.geometry[key]
                                     mesh_new = translate_vertices(mesh, (x_offset, y_offset, z_offset))
                                     mesh_new = filter_faces_by_geom(mesh_new, adjacent_box)
                                     meshes.append(mesh_new)
 
+
                                     #print(description, mesh_new.bounds)
 
 
                         elif filepath.suffix in [".gpkg", ".geojson"]:
-                            gdf = gpd.read_file(filepath).clip(tile_box)
+                            gdf = gpd.read_file(filepath).clip(tile_box)#[0:1000]
                             for geom_id,geom in enumerate(gdf["geometry"]):
                                 x_offset, y_offset, z_offset = center
 
@@ -1431,23 +1449,69 @@ class GeoSceneSet:
                                 y_offset = center[1] * -1
                                 z_offset = z_offset * -1
 
+                                meshes_init = []
                                 scene = trimesh.load(Path(assets_dirpath, asset_filename))
                                 for key_id, key in enumerate(scene.geometry):
                                     if type(scene.geometry[key]).__name__ == "Trimesh":
                                         mesh = scene.geometry[key]
-                                        #mesh.apply_scale(1.0 / mesh.extents)
-                                        mesh.apply_scale(scale_factor / mesh.extents)
-                                        #mesh.apply_scale(10.0)
-                                        #mesh.apply_scale(10.0 * mesh.extents)
-                                        mesh_new = mesh
-                                        if y_up:
-                                            mesh_new = switch_axis(mesh_new)
-                                        mesh_new = translate_vertices(mesh_new, (geom.centroid.x, geom.centroid.y, 0))
-                                        #mesh_new = translate_vertices(mesh, (x_offset, y_offset, z_offset))
-                                        mesh_new = filter_faces_by_geom(mesh_new, adjacent_box)
-                                        meshes.append(mesh_new)
+                                        meshes_init.append(mesh)
+                                
+                                mesh = trimesh.util.concatenate(meshes_init)
+                                #meshes = [meshes_concat]
 
-                                        print(description, geom, mesh_new.bounds)
+                                        
+                                print(assets_dirpath, asset_filename)
+                                print(len(scene.geometry))
+                                print(len(mesh.vertices))
+                                #sys.exit()
+
+                                #print(mesh.visual.uv)
+                                #print(mesh.visual.TextureVisuals)
+                                #sys.exit()
+
+                                open3d_mesh = open3d.geometry.TriangleMesh()
+                                open3d_mesh.vertices = open3d.utility.Vector3dVector(
+                                    mesh.vertices
+                                )
+                                open3d_mesh.triangles = open3d.utility.Vector3iVector(
+                                    mesh.faces
+                                )
+
+                                open3d_mesh.scale(scale_factor, center=open3d_mesh.get_center())
+                                #open3d_mesh.orient_triangles()
+                                open3d_mesh.compute_triangle_normals(normalized=True)
+                                open3d_mesh.compute_vertex_normals(normalized=True)
+                                #open3d_mesh.remove_degenerate_triangles()
+                                #open3d_mesh.remove_duplicated_triangles()
+                                #open3d_mesh.remove_duplicated_vertices()
+                                #open3d_mesh.remove_unreferenced_vertices()
+
+                                mesh.vertices=open3d_mesh.vertices
+                                mesh.faces=open3d_mesh.triangles
+                                mesh.face_normals=open3d_mesh.triangle_normals
+                                mesh.vertex_normals=open3d_mesh.vertex_normals
+
+
+
+                                #mesh.apply_scale(scale_factor / mesh.extents)
+                                #print(len(mesh.vertices))
+                                mesh_new = mesh
+                                if y_up:
+                                    mesh_new = switch_axis(mesh_new)
+
+                                #print(len(mesh_new.vertices))
+                                #sys.exit()
+
+                                mesh_new = translate_vertices(mesh_new, (geom.centroid.x, geom.centroid.y, 0))
+                                #mesh_new = translate_vertices(mesh, (x_offset, y_offset, z_offset))
+                                mesh_new = filter_faces_by_geom(mesh_new, adjacent_box)
+
+                                meshes.append(mesh_new)
+
+                                print(description, geom, mesh_new.bounds)
+                            
+                            #meshes_concat = trimesh.util.concatenate(meshes)
+                            #meshes = [meshes_concat]
 
 
 
@@ -1468,9 +1532,11 @@ class GeoSceneSet:
 
 
                     scene_out = trimesh.Scene()
-                    for index, row in map2d_adjacent.iterrows():
+                    for idx, (index, row) in enumerate(map2d_adjacent.iterrows()):
                         for mesh_id, mesh in enumerate(meshes):
                             if len(mesh.faces) > 0:
+
+                                logging.info(f"Geometry {idx}, Mesh {mesh_id}")
 
                                 #print(row["geometry"])
                                 if row["geometry"].centroid.intersects(tile.geom):
@@ -1548,6 +1614,10 @@ class GeoSceneSet:
                                             mesh_component, (x_offset, y_offset, z_offset)
                                         )
 
+                                        #print(mesh_component.visual.texture.TextureVisuals)
+                                        #sys.exit()
+
+
                                         scene_out.add_geometry(
                                             mesh_component,
                                             node_name=str(index),
@@ -1570,7 +1640,7 @@ class GeoSceneSet:
 
                     map2d_left, map2d_bottom, map2d_right, map2d_top = map2d.total_bounds
 
-                    if not np.isnan(map2d_left):
+                    if not np.isnan(map2d_left) and not keep_uv:
 
                         if map2d_left < tile.total_bounds[0]:
                             map2d_left = tile.total_bounds[0] - (math.ceil((tile.total_bounds[0] - map2d_left) / tile.res[0]) * tile.res[0])

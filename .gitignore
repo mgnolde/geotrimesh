@@ -3,3 +3,4 @@
 *.scad
 __pycache__/
 data/
+out/

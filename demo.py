@@ -8,14 +8,15 @@ import argparse
 
 logging.basicConfig(level=logging.INFO)
 
-out_dirpath = Path(os.getcwd(), "data")
+out_dirpath = Path(os.getcwd(), "out")
 
 if not os.path.isdir(out_dirpath):
     os.makedirs(out_dirpath)
 
 demodata_dirpath = Path(os.getcwd(), "demodata")
+data_dirpath = Path(os.getcwd(), "data")
 boundary_filepath = Path(demodata_dirpath, "bbox.gpkg")
-buildings_filepaths = [Path(demodata_dirpath, "zurich_lod2_clip.glb")]
+buildings_filepaths = [Path(data_dirpath, "zurich_lod2.glb")]
 
 dem_filepaths = [Path(demodata_dirpath, "dtm_26830_12470_clip_lq.tif")]
 ortho_filepaths = [Path(demodata_dirpath, "2507_clip.tif")]
@@ -28,6 +29,7 @@ tilingscheme = GeoSceneSet.TilingScheme(boundary, dem_filepaths, height=32, widt
 tilingscheme.gdf.to_file(Path(out_dirpath, "tiles.gpkg"))
 
 zurich.terrain = GeoSceneSet.Terrain(
+    tilingscheme=tilingscheme,
     out_dirpath=out_dirpath,
     filepaths=dem_filepaths,
     tiles=tilingscheme.tiles[0:4],

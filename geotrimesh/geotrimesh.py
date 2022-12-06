@@ -220,6 +220,7 @@ class GeoSceneSet:
             out_dirpath=tempfile.gettempdir(),
             filepaths=None,
             tiles=None,
+            tiles_selected=None,
             boundary=None,
             y_up=True,
             include_texture=False,
@@ -228,9 +229,13 @@ class GeoSceneSet:
 
             logging.info("Setting texture coordinates")
 
+            if not tiles_selected:
+                tiles_selected = [tile.id for tile in tiles]
+
+
             for tile in tiles:
 
-                if tile.valid:
+                if tile.id in tiles_selected:
 
                     for glb_id,feature in enumerate(tilingscheme.features):
                     
@@ -478,6 +483,7 @@ class GeoSceneSet:
             temp_dirpath=tempfile.gettempdir(),
             out_dirpath=tempfile.gettempdir(),
             tiles=None,
+            tiles_selected=None,
             filepaths=[],
             tile=None,
             boundary=None,
@@ -486,42 +492,46 @@ class GeoSceneSet:
             openscad_bin_filepath=Path("openscad"),
         ):
 
-            logging.info("Processing Terrain")
-
             if not description in tilingscheme.features:
                 tilingscheme.features[description] = {"keep_uv": keep_uv}
 
+            if not tiles_selected:
+                tiles_selected = [tile.id for tile in tiles]
 
             for tile in tiles:
 
-                self.mosaic, self.z_bounds_total = self.generate_terrain_mosaic(
-                    filepaths, tile
-                )
+                if tile.id in tiles_selected:
 
-                self.mesh = self.generate_terrain_mesh(
-                    self.mosaic,
-                    boundary,
-                    self.z_bounds_total,
-                    tile,
-                    temp_dirpath,
-                    openscad_bin_filepath,
-                )
+                    logging.info(f"[{tile.id}] Processing Terrain")
 
-
-                self.scene = trimesh.Scene()
-                self.scene.add_geometry(self.mesh, node_name="mesh", geom_name="mesh")
-
-                out_filename_base = description + "__" + str(tile.id[0]) + "_" + str(tile.id[1])
-
-                with open(
-                    Path(temp_dirpath, out_filename_base + ".glb"),
-                    "wb",
-                ) as f:
-                    f.write(
-                        trimesh.exchange.gltf.export_glb(
-                            self.scene, include_normals=True
-                        )
+                    self.mosaic, self.z_bounds_total = self.generate_terrain_mosaic(
+                        filepaths, tile
                     )
+
+                    self.mesh = self.generate_terrain_mesh(
+                        self.mosaic,
+                        boundary,
+                        self.z_bounds_total,
+                        tile,
+                        temp_dirpath,
+                        openscad_bin_filepath,
+                    )
+
+
+                    self.scene = trimesh.Scene()
+                    self.scene.add_geometry(self.mesh, node_name="mesh", geom_name="mesh")
+
+                    out_filename_base = description + "__" + str(tile.id[0]) + "_" + str(tile.id[1])
+
+                    with open(
+                        Path(temp_dirpath, out_filename_base + ".glb"),
+                        "wb",
+                    ) as f:
+                        f.write(
+                            trimesh.exchange.gltf.export_glb(
+                                self.scene, include_normals=True
+                            )
+                        )
 
 
 
@@ -1104,6 +1114,7 @@ class GeoSceneSet:
             recombine_bodies=False,
             simplify_factor=None,
             tiles=None,
+            tiles_selected=None,
             assets_dirpath=None,
             asset_filename=None,
             scale_factor=1.0,
@@ -1118,11 +1129,15 @@ class GeoSceneSet:
 
             logging.info("Processing Features")
 
+            if not tiles_selected:
+                tiles_selected = [tile.id for tile in tiles]
+
+
             def _get_mesh_elevation_from_xy(mesh, coord):
 
                 x_coord, y_coord = coord
-                pSource = [x_coord, y_coord, -9999999999]
-                pTarget = [x_coord, y_coord, 9999999999]
+                pSource = [x_coord, y_coord, -999999]
+                pTarget = [x_coord, y_coord, 999999]
 
                 obbTree = vtk.vtkOBBTree()
                 obbTree.SetDataSet(mesh)
@@ -1225,15 +1240,19 @@ class GeoSceneSet:
                         ],
                     ]
 
+                    #z_min = None
                     for point in points:
 
-                        points_list.append((point[0],point[1],point[2]))
-                        #z_max = max(z_max, point[2]) if z_max else point[2]
-
-                        if not z_min or (z_min and point[2] < z_min):
+                        if not z_min or (z_min and round(point[2],10) < round(z_min,10)):
                             z_min = point[2]
                             z_min_x = point[0]
                             z_min_y = point[1]
+
+                            #points_list = []
+                            points_list.append((point[0],point[1],point[2]))
+                        elif round(point[2],10) < round(z_min,10):
+                            points_list.append((point[0],point[1],point[2]))
+
 
                 return points_list
 
@@ -1314,7 +1333,7 @@ class GeoSceneSet:
 
                 logging.info(f"Tile {tile_id} / {len(tiles)}")
 
-                if True:
+                if tile.id in tiles_selected:
 
                     features_out_filepath = str(
                         Path(
@@ -1384,12 +1403,16 @@ class GeoSceneSet:
 
                             for adjacent_tile in tiles:
 
+                                #print(adjacent_tile.id, (adjacent_tile_id_y, adjacent_tile_id_x))
+
                                 if adjacent_tile.id == (
                                     adjacent_tile_id_y,
                                     adjacent_tile_id_x
                                 ):
 
                                     adjacent_tiles.append(adjacent_tile)
+
+
 
                     tile_box = box(
                         tile.geom.bounds[0],
@@ -1545,70 +1568,86 @@ class GeoSceneSet:
                                         mesh, row["geometry"]
                                     )
                                     #z_lowest = get_stats(mesh_component)[0]
-                                    z_lowest_list = sorted(get_stats(mesh_component), key=itemgetter(2))[0:10]
+                                    z_lowest_list = sorted(get_stats(mesh_component), key=itemgetter(2), reverse=True)
+                                    #z_lowest_list = sorted(mesh_component.vertices, key=itemgetter(2), reverse=True)
 
-                                    #print(z_lowest_list[0:3])
+
+                                    #print(z_lowest_list)
+                                    #sys.exit()
                                     #print(z_lowest_list[0:3000000])
 
                                     z_lowest_terrain = None
+                                    z_offset_default = 0
 
-                                    for z_lowest in z_lowest_list:
+                                    for z_lowest_idx, z_lowest in enumerate(z_lowest_list):
 
-                                        for adjacent_tile in adjacent_tiles:
+                                        if not z_lowest_terrain:
 
-                                            if Point(z_lowest[0], z_lowest[1]).intersects(
-                                                adjacent_tile.geom
-                                            ):
+                                            print("run", z_lowest_idx, "of", len(z_lowest_list), z_lowest, len(adjacent_tiles))
 
-                                                #print("adjacent", adjacent_tile.id)
-                                                glb_filepath = str(
-                                                    Path(
-                                                        temp_dirpath,
-                                                        "terrain"
-                                                        + "__"
-                                                        + str(adjacent_tile.id[0])
-                                                        + "_"
-                                                        + str(adjacent_tile.id[1])
-                                                        + ".glb",
-                                                    )
-                                                )
+                                            for adjacent_tile in adjacent_tiles:
 
-                                                glb_reader = vtk.vtkGLTFReader()
-                                                glb_reader.SetFileName(glb_filepath)
-                                                glb_reader.Update()
-                                                polydata = vtk.vtkCompositeDataGeometryFilter()
-                                                polydata.SetInputConnection(
-                                                    glb_reader.GetOutputPort()
-                                                )
-                                                polydata.Update()
-                                                stl = polydata.GetOutput()
+                                                print(idx, Point(z_lowest[0], z_lowest[1]), adjacent_tile.geom, Point(z_lowest[0], z_lowest[1]).intersects(adjacent_tile.geom))
 
-                                                ## check if source actually contains a mesh
-                                                if stl.GetPoints():
+                                                if Point(z_lowest[0], z_lowest[1]).intersects(
+                                                    adjacent_tile.geom
+                                                ):
 
-                                                    scale = (1.0, 1.0, 1.0)
-                                                    z_lowest_terrain = _get_mesh_elevation_from_xy(
-                                                        stl,
-                                                        (
-                                                            (z_lowest[0] - center[0]) * scale[0],
-                                                            (z_lowest[1] - center[1]) * scale[1],
-                                                        ),
+                                                    #print("adjacent", adjacent_tile.id)
+                                                    glb_filepath = str(
+                                                        Path(
+                                                            temp_dirpath,
+                                                            "terrain"
+                                                            + "__"
+                                                            + str(adjacent_tile.id[0])
+                                                            + "_"
+                                                            + str(adjacent_tile.id[1])
+                                                            + ".glb",
+                                                        )
                                                     )
 
-                                                    if not z_lowest_terrain:
-                                                        pass
-                                                        #print(adjacent_tile.id[0], adjacent_tile.id[1], "error at", z_lowest[0], z_lowest[1], adjacent_tile.geom)
-                                                    else: 
-                                                        break
+                                                    print("match")
+                                                    print(z_lowest)
+                                                    print(glb_filepath)
+
+
+                                                    glb_reader = vtk.vtkGLTFReader()
+                                                    glb_reader.SetFileName(glb_filepath)
+                                                    glb_reader.Update()
+                                                    polydata = vtk.vtkCompositeDataGeometryFilter()
+                                                    polydata.SetInputConnection(
+                                                        glb_reader.GetOutputPort()
+                                                    )
+                                                    polydata.Update()
+                                                    stl = polydata.GetOutput()
+
+                                                    ## check if source actually contains a mesh
+                                                    if stl.GetPoints():
+
+                                                        scale = (1.0, 1.0, 1.0)
+                                                        z_lowest_terrain = _get_mesh_elevation_from_xy(
+                                                            stl,
+                                                            (
+                                                                (z_lowest[0] - center[0]) * scale[0],
+                                                                (z_lowest[1] - center[1]) * scale[1],
+                                                            ),
+                                                        )
+
+                                                        print(z_lowest_terrain)
+
+                                                        #if z_lowest_terrain:
+                                                        #    break
+
 
 
 
 
                                     if z_lowest_terrain:
+                                        z_offset = (z_lowest[2] - z_lowest_terrain) * -1
+                                        z_offset_default = z_offset
 
                                         x_offset = center[0] * -1
                                         y_offset = center[1] * -1
-                                        z_offset = (z_lowest[2] - z_lowest_terrain) * -1
 
                                         mesh_component = translate_vertices(
                                             mesh_component, (x_offset, y_offset, z_offset)
